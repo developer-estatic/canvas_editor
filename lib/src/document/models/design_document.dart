@@ -1,6 +1,9 @@
 import 'dart:ui';
 import '../../extensions/custom_node_type.dart';
 
+/// A positioned, selectable item on a [DesignDocument] (text, image, or custom).
+///
+/// Background Fill is stored as [BackgroundNode] but is not selectable.
 abstract class DesignNode {
   final String id;
   final String type;
@@ -60,15 +63,19 @@ abstract class DesignNode {
       scaleY.hashCode;
 }
 
+/// Editable text Node. Default [fontSize] is 48.
 class TextNode extends DesignNode {
   final String text;
   final String fontFamily;
   final double fontSize;
-  final int fontWeight; // e.g. 400, 700
+  /// Font weight as CSS-style number (e.g. 400, 700).
+  final int fontWeight;
   final double lineHeight;
   final double letterSpacing;
-  final String textColor; // Hex string e.g. '#FF000000'
-  final String textAlign; // 'left', 'center', 'right'
+  /// ARGB hex, e.g. `'#FF000000'`.
+  final String textColor;
+  /// `'left'`, `'center'`, or `'right'`.
+  final String textAlign;
 
   const TextNode({
     required super.id,
@@ -79,7 +86,7 @@ class TextNode extends DesignNode {
     super.scaleY,
     required this.text,
     this.fontFamily = 'Inter',
-    this.fontSize = 24.0,
+    this.fontSize = 48.0,
     this.fontWeight = 400,
     this.lineHeight = 1.2,
     this.letterSpacing = 0.0,
@@ -163,7 +170,7 @@ class TextNode extends DesignNode {
       scaleY: (transformMap?['scaleY'] as num? ?? 1).toDouble(),
       text: json['text'] as String,
       fontFamily: styleMap['fontFamily'] as String? ?? 'Inter',
-      fontSize: (styleMap['fontSize'] as num? ?? 24.0).toDouble(),
+      fontSize: (styleMap['fontSize'] as num? ?? 48.0).toDouble(),
       fontWeight: styleMap['fontWeight'] as int? ?? 400,
       lineHeight: (styleMap['lineHeight'] as num? ?? 1.2).toDouble(),
       letterSpacing: (styleMap['letterSpacing'] as num? ?? 0.0).toDouble(),
@@ -200,10 +207,12 @@ class TextNode extends DesignNode {
 
 
 
+/// Image Node backed by a local file and/or Host-resolved [assetId].
 class ImageNode extends DesignNode {
   final String? assetId;
   final String? localPath;
-  final String fit; // 'cover', 'contain', 'fill'
+  /// Box-fit style: `'cover'`, `'contain'`, or `'fill'`.
+  final String fit;
 
   const ImageNode({
     required super.id,
@@ -293,6 +302,8 @@ class ImageNode extends DesignNode {
 
 
 
+/// Background Fill stored as a node. Not selectable via hit-testing; use product
+/// language "background fill" in Host UI, not "background node".
 class BackgroundNode extends DesignNode {
   final String color; // Hex string e.g. '#FFFFFFFF'
   final String? assetId;
@@ -393,10 +404,13 @@ class BackgroundNode extends DesignNode {
 
 
 
+/// Persisted canvas content: size plus ordered [nodes] (JSON-serializable).
 class DesignDocument {
   final String id;
   final int version;
+  /// Document width in document units.
   final double width;
+  /// Document height in document units.
   final double height;
   final List<DesignNode> nodes;
 

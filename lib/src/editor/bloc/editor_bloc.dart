@@ -132,6 +132,12 @@ class EditorState {
   final List<DesignDocument> undoStack;
   final List<DesignDocument> redoStack;
 
+  /// One-shot pulse: this emission is a committed Design Document change
+  /// (same moments as undo recording / history commit). Mid-gesture updates
+  /// leave this false so Host UI can use [CanvasEditorController.onDocumentChanged]
+  /// like Slider.onChangeEnd while [stateStream] stays live.
+  final bool documentCommitted;
+
   const EditorState({
     required this.document,
     this.selectedNodeId,
@@ -139,6 +145,7 @@ class EditorState {
     this.viewportOffset = Offset.zero,
     this.undoStack = const [],
     this.redoStack = const [],
+    this.documentCommitted = false,
   });
 
   EditorState copyWith({
@@ -149,6 +156,7 @@ class EditorState {
     Offset? viewportOffset,
     List<DesignDocument>? undoStack,
     List<DesignDocument>? redoStack,
+    bool documentCommitted = false,
   }) {
     return EditorState(
       document: document ?? this.document,
@@ -157,6 +165,7 @@ class EditorState {
       viewportOffset: viewportOffset ?? this.viewportOffset,
       undoStack: undoStack ?? this.undoStack,
       redoStack: redoStack ?? this.redoStack,
+      documentCommitted: documentCommitted,
     );
   }
 }
@@ -200,7 +209,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
   }
 
   void _onLoadDocument(LoadDocumentEvent event, Emitter<EditorState> emit) {
-    emit(EditorState(document: event.document));
+    emit(EditorState(document: event.document, documentCommitted: true));
   }
 
   void _onUpdateNodeFrame(UpdateNodeFrameEvent event, Emitter<EditorState> emit) {
@@ -342,6 +351,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
       document: previousDoc,
       undoStack: remainingUndo,
       redoStack: newRedo,
+      documentCommitted: true,
     ));
   }
 
@@ -356,6 +366,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
       document: nextDoc,
       undoStack: newUndo,
       redoStack: remainingRedo,
+      documentCommitted: true,
     ));
   }
 
@@ -386,6 +397,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     emit(state.copyWith(
       undoStack: newUndoStack,
       redoStack: const [],
+      documentCommitted: true,
     ));
   }
 
@@ -520,6 +532,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
         document: newDoc,
         selectedNodeId: selectNodeId,
         clearSelection: clearSelection,
+        documentCommitted: false,
       ));
       return;
     }
@@ -531,6 +544,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
       redoStack: const [], // Clear redo history on new action
       selectedNodeId: selectNodeId,
       clearSelection: clearSelection,
+      documentCommitted: true,
     ));
   }
 }

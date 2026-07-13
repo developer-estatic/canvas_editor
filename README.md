@@ -1,6 +1,6 @@
-# Canvas Editor (`canvas_editor`)
+# Canvas Editor (`flutter_canvas_editor`)
 
-A high-performance, Canva-like canvas template editor engine for Flutter. It provides an embedded editor canvas widget, a clean controller interface, reactive state streams, customizable selection borders/handles, layer ordering, undo/redo history, text reflow, background fill (color and image), callback-based image loading, dynamic custom node extension, and pixel-identical PNG export.
+A high-performance, design-tool-style canvas template editor engine for Flutter. It provides an embedded editor canvas widget, a clean controller interface, reactive state streams, customizable selection borders/handles, layer ordering, undo/redo history, text reflow, background fill (color and image), callback-based image loading, dynamic custom node extension, and pixel-identical PNG export.
 
 The library owns the **canvas engine only** — toolbars, insert bars, property panels, and colour pickers are built by the consumer app around the controller.
 
@@ -10,11 +10,22 @@ The library owns the **canvas engine only** — toolbars, insert bars, property 
 
 ### Installation
 
-Add the dependency to your `pubspec.yaml` (path or pub reference):
+```yaml
+dependencies:
+  flutter_canvas_editor: ^1.0.0
+```
+
+Then:
+
+```dart
+import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
+```
+
+For local development against this repo:
 
 ```yaml
 dependencies:
-  canvas_editor:
+  flutter_canvas_editor:
     path: /path/to/canvas_editor
 ```
 
@@ -31,7 +42,7 @@ Or embed the editor directly:
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:canvas_editor/canvas_editor.dart';
+import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 void main() => runApp(const MyApp());
 
@@ -86,9 +97,10 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
 
 | Concern | Owner |
 |---|---|
-| Canvas rendering, gestures, selection, undo/redo | `canvas_editor` package |
+| Canvas rendering, gestures, selection, undo/redo | `flutter_canvas_editor` package |
 | Toolbars, insert bars, property panels, routing | Consumer app |
-| Document persistence / autosave | Consumer app (via `onDocumentChanged` or `stateStream`) |
+| Document persistence / autosave | Consumer app (via `onDocumentChanged` — fires on commit, not mid-drag) |
+| Live selection / chrome UI | Consumer app (via `stateStream`) |
 | Remote / bundled image resolution | Consumer app (via `imageProvider`) |
 
 `CanvasEditorWidget` is **zero chrome** — embed it inside your layout and drive it through `CanvasEditorController`, similar to `TextEditingController`.
@@ -101,7 +113,7 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:canvas_editor/canvas_editor.dart';
+import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 
 class MyCanvasEditorScreen extends StatefulWidget {
   const MyCanvasEditorScreen({super.key});
@@ -238,7 +250,7 @@ _controller = CanvasEditorController({
 | `initialDocument` | Starting canvas state. Defaults to a 1080×1080 white background. |
 | `imageProvider` | Resolves `assetId` references to `ImageProvider` instances (see [Image Loading](#image-loading)). |
 | `customNodeTypes` | Registers consumer-defined node types at startup. |
-| `onDocumentChanged` | Fires on every document mutation — useful for autosave. |
+| `onDocumentChanged` | Fires when a Design Document change is **committed** (same moments as undo: gesture end, add/delete, style commit, undo/redo, load). Mid-drag/resize/rotate updates go to `stateStream` only. |
 
 ### Read API
 
@@ -369,7 +381,7 @@ The canvas widget handles these gestures out of the box — no extra wiring requ
 | Tap selected text node | Start inline text editing |
 | Drag node | Move |
 | Corner handles (image / custom nodes) | Resize (all corners) |
-| Side handles (text nodes) | Horizontal resize only (Canva-style); height reflows to fit wrapped text |
+| Side handles (text nodes) | Horizontal resize only (design-tool-style); height reflows to fit wrapped text |
 | Rotation handle | Rotate around node centre |
 
 Text nodes use **horizontal-only resize handles** on the left and right sides. When text wraps, frame height is recalculated automatically via `TextReflow`.
@@ -447,7 +459,8 @@ CanvasEditorWidget(
     handleSize: 8.0,
     selectionBorderColor: Colors.blue,
     selectionBorderWidth: 1.5,
-    rotationHandleColor: Colors.blue,
+    // Optional — defaults to selectionBorderColor when omitted
+    // rotationHandleColor: Colors.orange,
   ),
 );
 ```
@@ -456,7 +469,7 @@ CanvasEditorWidget(
 
 ## Public Exports
 
-The barrel file `package:canvas_editor/canvas_editor.dart` exports:
+The barrel file `package:flutter_canvas_editor/flutter_canvas_editor.dart` exports:
 
 | Symbol | Purpose |
 |---|---|
@@ -466,8 +479,10 @@ The barrel file `package:canvas_editor/canvas_editor.dart` exports:
 | `CanvasTheme` | Selection handle / border theming |
 | `DesignDocument`, `DesignNode`, `TextNode`, `ImageNode`, `BackgroundNode` | Document model |
 | `CustomNodeType`, `CustomNodeRegistry` | Node extension registry |
-| `CoordinateSystem` | Document ↔ screen coordinate conversion |
+| `CoordinateSystem` | Doc ↔ screen mapping for custom overlays (most Hosts can ignore) |
 | `CanvasImageReference`, `CanvasImageLoader`, `CanvasImageProvider` | Image load path |
+
+Use [CanvasEditorWidget] — do not call `CanvasEditorController.buildCanvas` from Host UI.
 
 Internal implementation (`EditorBloc`, painters, hit-testing) is private under `lib/src/` and not part of the public API.
 
@@ -479,7 +494,7 @@ Internal implementation (`EditorBloc`, painters, hit-testing) is private under `
 2. **Controller + state stream** — familiar Flutter pattern; BLoC is an internal detail
 3. **Document manipulation** — add/delete text and image nodes, update styles, background colour and image
 4. **Text reflow** — automatic height adjustment when content or width changes
-5. **Canva-style text resize** — horizontal side handles only; height follows wrapped text
+5. **design-tool-style text resize** — horizontal side handles only; height follows wrapped text
 6. **Inline text editing** — double-tap a selected text node to edit on canvas
 7. **Drag, resize, rotate** — built-in gesture handling with rotation anchor
 8. **Layer reordering** — bring forward / send backward / to front / to back

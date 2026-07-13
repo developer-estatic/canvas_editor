@@ -6,11 +6,14 @@ import 'package:flutter/painting.dart';
 
 import '../document/models/design_document.dart';
 
-/// Portable image reference for Image Load Path (local file or Asset Id).
+/// Portable image reference: local file path and/or Host [assetId].
 class CanvasImageReference {
   const CanvasImageReference({this.localPath, this.assetId});
 
+  /// Absolute or app-relative file path. Preferred over [assetId] when both set.
   final String? localPath;
+
+  /// Host-defined id (URL, asset key, etc.) resolved via [CanvasImageProvider].
   final String? assetId;
 
   bool get isEmpty =>
@@ -39,11 +42,15 @@ class CanvasImageReference {
   }
 }
 
-/// Consumer callback to resolve [assetId] (e.g. network URL) to an [ImageProvider].
+/// Host callback that maps an `assetId` reference to an [ImageProvider].
 typedef CanvasImageProvider = ImageProvider Function(CanvasImageReference ref);
 
-/// Loads pixels for live canvas / export: [localPath] first, else [imageProvider].
+/// Resolves image pixels for the live canvas and PNG export.
+///
+/// Prefers [CanvasImageReference.localPath], then [CanvasImageProvider] for
+/// [CanvasImageReference.assetId].
 abstract final class CanvasImageLoader {
+  /// Loads a single image, or `null` if it cannot be resolved.
   static Future<ui.Image?> resolveToUiImage({
     required CanvasImageReference ref,
     CanvasImageProvider? imageProvider,
@@ -90,6 +97,7 @@ abstract final class CanvasImageLoader {
     }
   }
 
+  /// Preloads all image references found on [document] into a cache map.
   static Future<Map<String, ui.Image>> buildCacheForDocument({
     required DesignDocument document,
     CanvasImageProvider? imageProvider,

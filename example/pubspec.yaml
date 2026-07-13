@@ -1,10 +1,8 @@
 name: canvas_editor_example
-description: "Runnable demo for the canvas_editor package."
+description: "Runnable demo for the flutter_canvas_editor package."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
-homepage: https://example.com
-repository: https://example.com
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -33,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  canvas_editor:
+  flutter_canvas_editor:
     path: ../
 
   cupertino_icons: ^1.0.8

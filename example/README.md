@@ -1,21 +1,26 @@
 # Canvas Editor Example
 
-Runnable demo for the [`canvas_editor`](../) package.
+Runnable Host UI demo for [`flutter_canvas_editor`](../).
 
 ## Run
 
+From the package root:
+
 ```bash
-cd packages/canvas_editor/example
+cd example
 flutter pub get
 flutter run
 ```
 
-## What it demonstrates
+## What it shows
 
-- Creating a [`CanvasEditorController`](../lib/src/controller/canvas_editor_controller.dart) with an initial [`DesignDocument`](../lib/src/document/models/design_document.dart)
-- Embedding [`CanvasEditorWidget`](../lib/src/widgets/canvas_editor_widget.dart) (zero chrome — the example adds its own toolbar and property panel)
-- Undo / redo and PNG export via the controller API
-- Reactive UI with [`stateStream`](../lib/src/controller/canvas_editor_state.dart)
-- A minimal [`imageProvider`](../lib/src/shared/image_load_path.dart) for asset IDs and local files
+| Topic | Where |
+|---|---|
+| Controller + initial `DesignDocument` | `lib/main.dart` |
+| Zero-chrome `CanvasEditorWidget` + Host toolbar / property panel | `lib/main.dart` |
+| Live UI via `stateStream` | undo buttons, property panel |
+| Committed changes via `onDocumentChanged` | `debugPrint` in `initState` |
+| PNG export | App bar export action |
+| `imageProvider` for assets / files | `_exampleImageProvider` |
 
-See the [package README](../README.md) for the full API reference.
+Full API: [package README](../README.md).

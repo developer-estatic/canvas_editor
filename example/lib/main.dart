@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:canvas_editor/canvas_editor.dart';
+import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:flutter/material.dart';
 
 void main() => runApp(const CanvasEditorExampleApp());
 
-/// Minimal runnable demo for [canvas_editor].
+/// Minimal runnable demo for [flutter_canvas_editor].
 ///
 /// Shows controller setup, [CanvasEditorWidget] embedding, undo/redo,
 /// adding text, and a small property panel driven by [stateStream].
@@ -63,7 +63,7 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
         ],
       ),
       onDocumentChanged: (document) {
-        debugPrint('Document changed (${document.nodes.length} nodes)');
+        debugPrint('Document committed (${document.nodes.length} nodes)');
       },
     );
   }

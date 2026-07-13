@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../controller/canvas_editor_controller.dart';
 import '../theme/canvas_theme.dart';
-import '../canvas_editor/canvas_editor.dart';
 
+/// Zero-chrome embeddable canvas. Host UI wraps this widget and drives it
+/// through [controller].
+///
+/// Built-in gestures: select, drag, resize, rotate, and double-tap text edit.
 class CanvasEditorWidget extends StatelessWidget {
+  /// Controller that owns the Design Document and history.
   final CanvasEditorController controller;
+
+  /// Optional selection chrome styling. Defaults to [CanvasTheme] blues.
   final CanvasTheme? theme;
 
   const CanvasEditorWidget({
@@ -16,12 +21,6 @@ class CanvasEditorWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: controller.bloc,
-      child: CanvasEditor(
-        theme: theme ?? const CanvasTheme(),
-        imageProvider: controller.imageProvider,
-      ),
-    );
+    return controller.buildCanvas(theme: theme ?? const CanvasTheme());
   }
 }

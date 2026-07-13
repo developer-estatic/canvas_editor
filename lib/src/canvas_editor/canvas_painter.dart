@@ -157,7 +157,7 @@ class CanvasPainter extends CustomPainter {
     final topCenter = Offset(screenRect.center.dx, screenRect.top);
     final rotHandleCenter = Offset(topCenter.dx, topCenter.dy - 30);
     final linePaint = Paint()
-      ..color = theme.rotationHandleColor
+      ..color = theme.effectiveRotationHandleColor
       ..strokeWidth = theme.selectionBorderWidth;
     canvas.drawLine(topCenter, rotHandleCenter, linePaint);
     canvas.drawCircle(rotHandleCenter, 5, handlePaint);
