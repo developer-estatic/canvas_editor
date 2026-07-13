@@ -148,6 +148,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
                       selectedNodeId: state.selectedNodeId,
                       imageCache: _imageCache,
                       theme: widget.theme,
+                      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
                     ),
                     size: Size(constraints.maxWidth, constraints.maxHeight),
                   ),

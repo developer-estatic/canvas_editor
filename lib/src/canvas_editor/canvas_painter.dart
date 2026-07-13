@@ -12,6 +12,8 @@ class CanvasPainter extends CustomPainter {
   final CoordinateSystem coords;
   final Map<String, ui.Image> imageCache;
   final CanvasTheme theme;
+  /// Used to size selection supersampling to the screen's physical pixels.
+  final double devicePixelRatio;
 
   CanvasPainter({
     required this.document,
@@ -19,6 +21,7 @@ class CanvasPainter extends CustomPainter {
     this.selectedNodeId,
     this.imageCache = const {},
     this.theme = const CanvasTheme(),
+    this.devicePixelRatio = 1.0,
   });
 
   @override
@@ -95,75 +98,193 @@ class CanvasPainter extends CustomPainter {
     canvas.restore(); // restore clipping and transform
   }
 
+  /// Selection chrome is supersampled so rotated edges stay smooth.
+  /// Factor tracks [devicePixelRatio] (clamped) so we don't undersample on
+  /// high-DPI screens; capped for interactive drag/rotate cost.
+  static const double _rotationHandleReach = 30.0;
+  static const double _rotationHandleRadius = 5.0;
+  static const double _softEdgeExtra = 1.25;
+
+  double get _selectionSupersample =>
+      devicePixelRatio.clamp(2.0, 4.0).ceilToDouble();
+
   void _drawSelectionOverlay(Canvas canvas, DesignNode node) {
     final screenRect = coords.docToScreenRect(node.frame);
+    final bounds = _selectionOverlayBounds(screenRect, node.rotation);
+    if (bounds.isEmpty) return;
+
+    final ss = _selectionSupersample;
+    final pixelW = math.max(1, (bounds.width * ss).ceil());
+    final pixelH = math.max(1, (bounds.height * ss).ceil());
+
+    final recorder = ui.PictureRecorder();
+    final layer = Canvas(recorder);
+    layer.scale(ss);
+    layer.translate(-bounds.left, -bounds.top);
+    _paintSelectionChrome(layer, node, screenRect);
+
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(pixelW, pixelH);
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, pixelW.toDouble(), pixelH.toDouble()),
+      bounds,
+      Paint()
+        ..isAntiAlias = true
+        ..filterQuality = FilterQuality.high,
+    );
+    image.dispose();
+  }
+
+  Rect _selectionOverlayBounds(Rect screenRect, double rotationDeg) {
+    final pad = math.max(
+          theme.handleSize,
+          theme.selectionBorderWidth,
+        ) /
+        2 +
+        _rotationHandleReach +
+        _rotationHandleRadius +
+        _softEdgeExtra +
+        4;
+    final center = screenRect.center;
+    final rad = rotationDeg * (math.pi / 180);
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+
+    Offset transform(Offset p) {
+      final dx = p.dx - center.dx;
+      final dy = p.dy - center.dy;
+      return Offset(
+        center.dx + dx * cosA - dy * sinA,
+        center.dy + dx * sinA + dy * cosA,
+      );
+    }
+
+    final points = <Offset>[
+      transform(screenRect.topLeft),
+      transform(screenRect.topRight),
+      transform(screenRect.bottomLeft),
+      transform(screenRect.bottomRight),
+      // Rotation stem tip (above top-center in local space).
+      transform(Offset(screenRect.center.dx, screenRect.top - _rotationHandleReach)),
+    ];
+
+    var minX = points.first.dx;
+    var minY = points.first.dy;
+    var maxX = points.first.dx;
+    var maxY = points.first.dy;
+    for (final p in points.skip(1)) {
+      minX = math.min(minX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxX = math.max(maxX, p.dx);
+      maxY = math.max(maxY, p.dy);
+    }
+    return Rect.fromLTRB(minX - pad, minY - pad, maxX + pad, maxY + pad);
+  }
+
+  void _paintSelectionChrome(
+    Canvas canvas,
+    DesignNode node,
+    Rect screenRect,
+  ) {
     final center = screenRect.center;
     final handleSize = theme.handleSize;
+    final stroke = theme.selectionBorderWidth;
 
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(node.rotation * (math.pi / 180));
     canvas.translate(-center.dx, -center.dy);
 
-    // Border
-    final borderPaint = Paint()
+    // Soft underlay hides residual stair-steps at awkward angles.
+    final softPaint = Paint()
+      ..color = theme.selectionBorderColor.withValues(alpha: 0.28)
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    _drawFilledStrokeRect(canvas, screenRect, stroke + _softEdgeExtra, softPaint);
+
+    final fillPaint = Paint()
       ..color = theme.selectionBorderColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = theme.selectionBorderWidth;
-    canvas.drawRect(screenRect, borderPaint);
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    _drawFilledStrokeRect(canvas, screenRect, stroke, fillPaint);
 
-    // Resize handles — Text Nodes: side mid-edge only; others: corners
-    final handlePaint = Paint()
+    final handleFill = Paint()
       ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    final handleBorder = Paint()
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    final handleStroke = Paint()
       ..color = theme.handleColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = theme.selectionBorderWidth;
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
 
-    if (node is TextNode) {
-      final sides = [
-        Offset(screenRect.left, screenRect.center.dy),
-        Offset(screenRect.right, screenRect.center.dy),
-      ];
-      for (final side in sides) {
-        final handleRect = Rect.fromCenter(
-          center: side,
-          width: handleSize,
-          height: handleSize,
-        );
-        canvas.drawRect(handleRect, handlePaint);
-        canvas.drawRect(handleRect, handleBorder);
-      }
-    } else {
-      final corners = [
-        screenRect.topLeft,
-        screenRect.topRight,
-        screenRect.bottomLeft,
-        screenRect.bottomRight,
-      ];
-      for (final corner in corners) {
-        final handleRect = Rect.fromCenter(
-          center: corner,
-          width: handleSize,
-          height: handleSize,
-        );
-        canvas.drawRect(handleRect, handlePaint);
-        canvas.drawRect(handleRect, handleBorder);
-      }
+    final handleCenters = node is TextNode
+        ? [
+            Offset(screenRect.left, screenRect.center.dy),
+            Offset(screenRect.right, screenRect.center.dy),
+          ]
+        : [
+            screenRect.topLeft,
+            screenRect.topRight,
+            screenRect.bottomLeft,
+            screenRect.bottomRight,
+          ];
+    for (final handleCenter in handleCenters) {
+      final outer = Rect.fromCenter(
+        center: handleCenter,
+        width: handleSize,
+        height: handleSize,
+      );
+      canvas.drawRect(outer.inflate(stroke / 2), handleStroke);
+      canvas.drawRect(outer.deflate(stroke / 2), handleFill);
     }
 
-    // Rotation handle — line + circle above top center
     final topCenter = Offset(screenRect.center.dx, screenRect.top);
-    final rotHandleCenter = Offset(topCenter.dx, topCenter.dy - 30);
-    final linePaint = Paint()
+    final rotHandleCenter =
+        Offset(topCenter.dx, topCenter.dy - _rotationHandleReach);
+    final stemPaint = Paint()
       ..color = theme.effectiveRotationHandleColor
-      ..strokeWidth = theme.selectionBorderWidth;
-    canvas.drawLine(topCenter, rotHandleCenter, linePaint);
-    canvas.drawCircle(rotHandleCenter, 5, handlePaint);
-    canvas.drawCircle(rotHandleCenter, 5, handleBorder);
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+    canvas.drawRect(
+      Rect.fromCenter(
+        center: Offset(topCenter.dx, (topCenter.dy + rotHandleCenter.dy) / 2),
+        width: stroke,
+        height: (topCenter.dy - rotHandleCenter.dy).abs(),
+      ),
+      stemPaint,
+    );
+    canvas.drawCircle(
+      rotHandleCenter,
+      _rotationHandleRadius + stroke / 2,
+      handleStroke,
+    );
+    canvas.drawCircle(
+      rotHandleCenter,
+      math.max(0.5, _rotationHandleRadius - stroke / 2),
+      handleFill,
+    );
 
     canvas.restore();
+  }
+
+  /// Stroke-like border as a filled even-odd ring (outer − inner).
+  void _drawFilledStrokeRect(
+    Canvas canvas,
+    Rect rect,
+    double strokeWidth,
+    Paint paint,
+  ) {
+    final half = strokeWidth / 2;
+    final outer = rect.inflate(half);
+    final inner = rect.deflate(half);
+    final path = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(outer);
+    if (inner.width > 0 && inner.height > 0) {
+      path.addRect(inner);
+    }
+    canvas.drawPath(path, paint);
   }
 
   void _drawBackground(Canvas canvas, BackgroundNode node, Rect screenRect) {
@@ -205,7 +326,9 @@ class CanvasPainter extends CustomPainter {
       old.document != document ||
       old.selectedNodeId != selectedNodeId ||
       old.coords.viewportScale != coords.viewportScale ||
-      old.coords.viewportOffset != coords.viewportOffset;
+      old.coords.viewportOffset != coords.viewportOffset ||
+      old.devicePixelRatio != devicePixelRatio ||
+      old.theme != theme;
 }
 
 /// Hit-test utilities for the canvas editor.
