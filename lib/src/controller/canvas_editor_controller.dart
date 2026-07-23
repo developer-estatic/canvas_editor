@@ -25,11 +25,20 @@ class CanvasEditorController {
   final EditorBloc _bloc;
 
   /// Resolves `assetId` image references (CDN URLs, assets, etc.).
+  ///
+  /// Required only when Design Documents use `assetId` / remote / bundled
+  /// asset references. Gallery `localPath`-only Hosts can omit this.
   final CanvasImageProvider? imageProvider;
 
   /// Called when a Design Document change is committed (gesture end, add/delete,
   /// history session commit, undo/redo, load) — not on every mid-drag frame.
+  ///
+  /// Prefer this for Host-owned persistence dirty tracking (not undo depth).
   final void Function(DesignDocument doc)? onDocumentChanged;
+
+  /// Custom Node types scoped to this Controller.
+  final CustomNodeRegistry customNodeRegistry;
+
   late final StreamController<CanvasEditorState> _stateStreamController;
   late final StreamSubscription<EditorState> _blocSubscription;
 
@@ -40,47 +49,48 @@ class CanvasEditorController {
   /// Creates a controller.
   ///
   /// If [initialDocument] is omitted, starts with a 1080×1080 white Background Fill.
+  ///
+  /// [customNodeTypes] are registered only on this Controller (not process-global).
   CanvasEditorController({
     DesignDocument? initialDocument,
     this.imageProvider,
     List<CustomNodeType>? customNodeTypes,
     this.onDocumentChanged,
-  }) : _bloc = EditorBloc(
-          initialDocument ??
-              const DesignDocument(
-                id: 'default_doc',
-                version: 1,
-                width: 1080,
-                height: 1080,
-                nodes: [
-                  BackgroundNode(
-                    id: 'bg_node',
-                    frame: Rect.fromLTWH(0, 0, 1080, 1080),
-                    zIndex: 0,
-                    color: '#FFFFFFFF',
-                  ),
-                ],
-              ),
-        ) {
-    if (customNodeTypes != null) {
-      CustomNodeRegistry.registerAll(customNodeTypes);
-    }
+  }) : customNodeRegistry = CustomNodeRegistry(customNodeTypes),
+       _bloc = EditorBloc(
+         initialDocument ??
+             const DesignDocument(
+               id: 'default_doc',
+               version: 1,
+               width: 1080,
+               height: 1080,
+               nodes: [
+                 BackgroundNode(
+                   id: 'bg_node',
+                   frame: Rect.fromLTWH(0, 0, 1080, 1080),
+                   zIndex: 0,
+                   color: '#FFFFFFFF',
+                 ),
+               ],
+             ),
+       ) {
     _stateStreamController = StreamController<CanvasEditorState>.broadcast();
-    
+
     // Wire up BLoC updates to the public stream; notify Host only on commits
     // (Slider.onChangeEnd-style), not mid-gesture pan frames.
     _blocSubscription = _bloc.stream.listen((blocState) {
       final selectedNode = blocState.selectedNodeId == null
           ? null
           : blocState.document.nodes.cast<DesignNode?>().firstWhere(
-                (n) => n?.id == blocState.selectedNodeId,
-                orElse: () => null,
-              );
+              (n) => n?.id == blocState.selectedNodeId,
+              orElse: () => null,
+            );
       final newState = CanvasEditorState(
         document: blocState.document,
         selectedNode: selectedNode,
         canUndo: blocState.undoStack.isNotEmpty,
         canRedo: blocState.redoStack.isNotEmpty,
+        // ignore: deprecated_member_use_from_same_package
         hasUnsavedChanges: blocState.undoStack.isNotEmpty,
       );
       _stateStreamController.add(newState);
@@ -99,14 +109,15 @@ class CanvasEditorController {
     final selectedNode = blocState.selectedNodeId == null
         ? null
         : blocState.document.nodes.cast<DesignNode?>().firstWhere(
-              (n) => n?.id == blocState.selectedNodeId,
-              orElse: () => null,
-            );
+            (n) => n?.id == blocState.selectedNodeId,
+            orElse: () => null,
+          );
     return CanvasEditorState(
       document: blocState.document,
       selectedNode: selectedNode,
       canUndo: blocState.undoStack.isNotEmpty,
       canRedo: blocState.redoStack.isNotEmpty,
+      // ignore: deprecated_member_use_from_same_package
       hasUnsavedChanges: blocState.undoStack.isNotEmpty,
     );
   }
@@ -124,6 +135,7 @@ class CanvasEditorController {
       child: CanvasEditor(
         theme: theme,
         imageProvider: imageProvider,
+        customNodes: customNodeRegistry,
       ),
     );
   }
@@ -135,23 +147,18 @@ class CanvasEditorController {
 
   /// Adds a text Node. Defaults to centered placeholder text when [text] / [position]
   /// are omitted.
-  void addTextNode({
-    String? text,
-    Offset? position,
-    bool select = true,
-  }) {
-    _bloc.add(AddTextNodeEvent(
-      text ?? 'Double tap to edit',
-      position ?? Offset(document.width / 2 - 150, document.height / 2 - 50),
-      select: select,
-    ));
+  void addTextNode({String? text, Offset? position, bool select = true}) {
+    _bloc.add(
+      AddTextNodeEvent(
+        text ?? 'Tap again to edit',
+        position ?? Offset(document.width / 2 - 150, document.height / 2 - 50),
+        select: select,
+      ),
+    );
   }
 
   /// Adds an image Node from a local file path.
-  void addImageNode({
-    required String localPath,
-    bool select = true,
-  }) {
+  void addImageNode({required String localPath, bool select = true}) {
     _bloc.add(AddImageNodeEvent(localPath, select: select));
   }
 
@@ -176,9 +183,9 @@ class CanvasEditorController {
     bool recordUndo = true,
   }) {
     final node = document.nodes.cast<DesignNode?>().firstWhere(
-          (n) => n?.id == nodeId,
-          orElse: () => null,
-        );
+      (n) => n?.id == nodeId,
+      orElse: () => null,
+    );
     if (node is TextNode) {
       final styled = node.copyWith(
         fontSize: fontSize,
@@ -195,15 +202,11 @@ class CanvasEditorController {
   }
 
   /// Updates text content and reflows height. See [updateTextStyle] for undo coalescing.
-  void updateTextContent(
-    String nodeId,
-    String text, {
-    bool recordUndo = true,
-  }) {
+  void updateTextContent(String nodeId, String text, {bool recordUndo = true}) {
     final node = document.nodes.cast<DesignNode?>().firstWhere(
-          (n) => n?.id == nodeId,
-          orElse: () => null,
-        );
+      (n) => n?.id == nodeId,
+      orElse: () => null,
+    );
     if (node is TextNode) {
       final updatedNode = _reflowTextNode(node.copyWith(text: text));
       _applyTextNodeUpdate(updatedNode, recordUndo: recordUndo);
@@ -261,6 +264,9 @@ class CanvasEditorController {
   }
 
   /// Sets Background Fill to a solid ARGB hex color (e.g. `'#FFFFFFFF'`).
+  ///
+  /// **Replace-fill:** a solid color update clears any Background Fill image
+  /// (`localPath` / `assetId`). It is not a tint under an existing image.
   void updateBackground(String colorHex, {bool recordUndo = true}) {
     final inSession = _historySessionSnapshot != null;
     if (inSession && recordUndo) {
@@ -299,46 +305,51 @@ class CanvasEditorController {
     _bloc.add(LoadDocumentEvent(doc));
   }
 
+  /// Parses JSON with this Controller's [customNodeRegistry].
+  DesignDocument documentFromJson(Map<String, dynamic> json) {
+    return DesignDocument.fromJson(json, customNodes: customNodeRegistry);
+  }
+
   /// Renders the current Design Document to PNG bytes (same pipeline as the live canvas).
   Future<Uint8List> exportToPng({double pixelRatio = 2.0}) async {
     final width = (document.width * pixelRatio).toInt();
     final height = (document.height * pixelRatio).toInt();
-    
+
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    
+
     final coords = CoordinateSystem(
       width: document.width,
       height: document.height,
       viewportScale: pixelRatio,
       viewportOffset: Offset.zero,
     );
-    
+
     // Load images via Image Load Path (localPath, then imageProvider for Asset Id)
     final cachedImages = await CanvasImageLoader.buildCacheForDocument(
       document: document,
       imageProvider: imageProvider,
     );
-    
+
     final painter = CanvasPainter(
       document: document,
       coords: coords,
       imageCache: cachedImages,
     );
-    
+
     painter.paint(canvas, Size(width.toDouble(), height.toDouble()));
-    
+
     final picture = recorder.endRecording();
     final img = await picture.toImage(width, height);
     final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-    
+
     // Clean up images
     for (final image in cachedImages.values) {
       image.dispose();
     }
     img.dispose();
     picture.dispose();
-    
+
     if (byteData == null) {
       throw Exception('Failed to generate PNG byte data');
     }

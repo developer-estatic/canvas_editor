@@ -56,7 +56,7 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
             id: 'text_1',
             frame: Rect.fromLTWH(140, 420, 800, 120),
             zIndex: 1,
-            text: 'Tap to select · Double-tap to edit',
+            text: 'Tap to select · Tap again to edit',
             fontSize: 36,
             textAlign: 'center',
           ),
@@ -68,14 +68,32 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
     );
   }
 
+  /// Demonstrates file / network / internal-asset branching in one callback.
+  ///
+  /// Host convention for opaque [CanvasImageReference.assetId] values:
+  /// - `http(s)://…` → network
+  /// - `asset:path/in/bundle.png` → bundled [AssetImage]
+  /// - anything else → treat as network URL (or your catalog lookup)
+  ///
+  /// `localPath` is preferred by the Engine load order before this callback runs;
+  /// the file branch here covers export/precache paths that still invoke the provider.
   ImageProvider _exampleImageProvider(CanvasImageReference ref) {
     if (ref.localPath != null && ref.localPath!.isNotEmpty) {
       return FileImage(File(ref.localPath!));
     }
-    if (ref.assetId != null && ref.assetId!.isNotEmpty) {
-      return NetworkImage(ref.assetId!);
+    final id = ref.assetId;
+    if (id == null || id.isEmpty) {
+      throw ArgumentError(
+        'CanvasImageReference has no resolvable image source',
+      );
     }
-    throw ArgumentError('CanvasImageReference has no resolvable image source');
+    if (id.startsWith('http://') || id.startsWith('https://')) {
+      return NetworkImage(id);
+    }
+    if (id.startsWith('asset:')) {
+      return AssetImage(id.substring('asset:'.length));
+    }
+    return NetworkImage(id);
   }
 
   Future<void> _exportPng() async {
@@ -278,7 +296,10 @@ class _PropertyPanel extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text('Text properties', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Text properties',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 12),
                 TextField(
                   decoration: const InputDecoration(

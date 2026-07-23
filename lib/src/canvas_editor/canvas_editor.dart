@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../document/document_color.dart';
 import '../document/models/design_document.dart';
 import '../editor/bloc/editor_bloc.dart';
 import '../renderer/coordinate_system.dart';
@@ -14,12 +15,14 @@ import 'canvas_painter.dart';
 class CanvasEditor extends StatefulWidget {
   final CanvasTheme theme;
   final CanvasImageProvider? imageProvider;
+  final CustomNodeRegistry customNodes;
 
-  const CanvasEditor({
+  CanvasEditor({
     super.key,
     this.theme = const CanvasTheme(),
     this.imageProvider,
-  });
+    CustomNodeRegistry? customNodes,
+  }) : customNodes = customNodes ?? CustomNodeRegistry();
 
   @override
   State<CanvasEditor> createState() => _CanvasEditorState();
@@ -40,6 +43,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
   String? _textEditingNodeId;
   final _textController = TextEditingController();
   final _textFocusNode = FocusNode();
+
   /// Document snapshot taken at gesture start for a single undo step.
   DesignDocument? _gestureUndoSnapshot;
 
@@ -71,7 +75,9 @@ class _CanvasEditorState extends State<CanvasEditor> {
 
   void _loadImageReference(CanvasImageReference ref) {
     final key = ref.cacheKey;
-    if (key == null || _imageCache.containsKey(key) || _loadingImages.contains(key)) {
+    if (key == null ||
+        _imageCache.containsKey(key) ||
+        _loadingImages.contains(key)) {
       return;
     }
     _loadingImages.add(key);
@@ -158,7 +164,9 @@ class _CanvasEditorState extends State<CanvasEditor> {
 
             // Render Custom nodes here as widgets
             for (final node in doc.nodes)
-              if (node is! TextNode && node is! ImageNode && node is! BackgroundNode)
+              if (node is! TextNode &&
+                  node is! ImageNode &&
+                  node is! BackgroundNode)
                 _buildCustomNodeWidget(context, node, coords),
 
             // Text editing overlay
@@ -175,7 +183,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
     DesignNode node,
     CoordinateSystem coords,
   ) {
-    final customType = CustomNodeRegistry.get(node.type);
+    final customType = widget.customNodes.resolve(node.type);
     if (customType == null) return const SizedBox.shrink();
 
     final screenRect = coords.docToScreenRect(node.frame);
@@ -187,9 +195,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
         transform: Matrix4.identity()
           ..rotateZ(node.rotation * (math.pi / 180))
           ..multiply(Matrix4.diagonal3Values(node.scaleX, node.scaleY, 1)),
-        child: IgnorePointer(
-          child: customType.builder(context, node),
-        ),
+        child: IgnorePointer(child: customType.builder(context, node)),
       ),
     );
   }
@@ -220,7 +226,9 @@ class _CanvasEditorState extends State<CanvasEditor> {
         alignment: Alignment.center,
         transform: Matrix4.identity()
           ..rotateZ(textNode.rotation * (math.pi / 180))
-          ..multiply(Matrix4.diagonal3Values(textNode.scaleX, textNode.scaleY, 1)),
+          ..multiply(
+            Matrix4.diagonal3Values(textNode.scaleX, textNode.scaleY, 1),
+          ),
         child: Container(
           color: Colors.white.withAlpha(200),
           child: TextField(
@@ -412,7 +420,9 @@ class _CanvasEditorState extends State<CanvasEditor> {
   ) {
     final state = bloc.state;
     final selectedId = state.selectedNodeId;
-    if (selectedId == null || _startFrame == null || _interactionStartDoc == null) {
+    if (selectedId == null ||
+        _startFrame == null ||
+        _interactionStartDoc == null) {
       return;
     }
 
@@ -495,13 +505,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
       width: width,
     );
 
-    bloc.add(
-      UpdateNodeFrameEvent(
-        node.id,
-        newFrame,
-        recordUndo: false,
-      ),
-    );
+    bloc.add(UpdateNodeFrameEvent(node.id, newFrame, recordUndo: false));
   }
 
   void _handleResize(
@@ -645,11 +649,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
   }
 }
 
-Color _parseHex(String hex) {
-  var h = hex.replaceAll('#', '');
-  if (h.length == 6) h = 'FF$h';
-  return Color(int.parse(h, radix: 16));
-}
+Color _parseHex(String hex) => decodeDocumentColor(hex);
 
 FontWeight _fontWeight(int w) {
   switch (w) {

@@ -5,7 +5,8 @@ import '../theme/canvas_theme.dart';
 /// Zero-chrome embeddable canvas. Host UI wraps this widget and drives it
 /// through [controller].
 ///
-/// Built-in gestures: select, drag, resize, rotate, and double-tap text edit.
+/// Built-in gestures: select, drag, resize, rotate, and tap-again text edit.
+/// The canvas fits to its parent; there is no user zoom/pan API.
 class CanvasEditorWidget extends StatelessWidget {
   /// Controller that owns the Design Document and history.
   final CanvasEditorController controller;
@@ -13,11 +14,7 @@ class CanvasEditorWidget extends StatelessWidget {
   /// Optional selection chrome styling. Defaults to [CanvasTheme] blues.
   final CanvasTheme? theme;
 
-  const CanvasEditorWidget({
-    super.key,
-    required this.controller,
-    this.theme,
-  });
+  const CanvasEditorWidget({super.key, required this.controller, this.theme});
 
   @override
   Widget build(BuildContext context) {

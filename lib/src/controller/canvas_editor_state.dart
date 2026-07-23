@@ -18,7 +18,15 @@ class CanvasEditorState {
   /// Whether [CanvasEditorController.redo] can run.
   final bool canRedo;
 
-  /// `true` when the undo stack is non-empty (document edited since load).
+  /// `true` when the undo stack is non-empty.
+  ///
+  /// **Deprecated:** this is not persistence dirty state. Track Host-owned
+  /// dirty flags via Committed Changes ([CanvasEditorController.onDocumentChanged]).
+  /// Will be removed in 2.0.
+  @Deprecated(
+    'Not persistence dirty state — undo stack depth is not "unsaved". '
+    'Track dirty via onDocumentChanged / Committed Changes. Removed in 2.0.',
+  )
   final bool hasUnsavedChanges;
 
   const CanvasEditorState({

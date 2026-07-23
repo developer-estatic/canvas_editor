@@ -1,61 +1,92 @@
 import 'dart:io' as io;
 import 'dart:ui' as ui;
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../document/models/design_document.dart';
 
 // --- EVENTS ---
-abstract class EditorEvent {}
+abstract class EditorEvent extends Equatable {
+  const EditorEvent();
+
+  @override
+  List<Object?> get props => [];
+}
 
 class LoadDocumentEvent extends EditorEvent {
   final DesignDocument document;
-  LoadDocumentEvent(this.document);
+  const LoadDocumentEvent(this.document);
+
+  @override
+  List<Object?> get props => [document];
 }
 
 class UpdateNodeFrameEvent extends EditorEvent {
   final String nodeId;
   final Rect newFrame;
   final bool recordUndo;
-  UpdateNodeFrameEvent(this.nodeId, this.newFrame, {this.recordUndo = true});
+  const UpdateNodeFrameEvent(
+    this.nodeId,
+    this.newFrame, {
+    this.recordUndo = true,
+  });
+
+  @override
+  List<Object?> get props => [nodeId, newFrame, recordUndo];
 }
 
 class UpdateNodeTextEvent extends EditorEvent {
   final String nodeId;
   final String newText;
   final bool recordUndo;
-  UpdateNodeTextEvent(this.nodeId, this.newText, {this.recordUndo = true});
+  const UpdateNodeTextEvent(
+    this.nodeId,
+    this.newText, {
+    this.recordUndo = true,
+  });
+
+  @override
+  List<Object?> get props => [nodeId, newText, recordUndo];
 }
 
 class UpdateBackgroundColorEvent extends EditorEvent {
   final String colorHex;
   final bool recordUndo;
-  UpdateBackgroundColorEvent(this.colorHex, {this.recordUndo = true});
+  const UpdateBackgroundColorEvent(this.colorHex, {this.recordUndo = true});
+
+  @override
+  List<Object?> get props => [colorHex, recordUndo];
 }
 
 class SetBackgroundImageEvent extends EditorEvent {
   final String? localPath;
   final String? assetId;
-  SetBackgroundImageEvent({this.localPath, this.assetId});
+  const SetBackgroundImageEvent({this.localPath, this.assetId});
+
+  @override
+  List<Object?> get props => [localPath, assetId];
 }
 
-class ClearBackgroundImageEvent extends EditorEvent {}
+class ClearBackgroundImageEvent extends EditorEvent {
+  const ClearBackgroundImageEvent();
+}
 
 class SelectNodeEvent extends EditorEvent {
   final String? nodeId;
-  SelectNodeEvent(this.nodeId);
+  const SelectNodeEvent(this.nodeId);
+
+  @override
+  List<Object?> get props => [nodeId];
 }
 
 class UpdateNodeEvent extends EditorEvent {
   final DesignNode node;
   final bool recordUndo;
-  UpdateNodeEvent(this.node, {this.recordUndo = true});
-}
+  const UpdateNodeEvent(this.node, {this.recordUndo = true});
 
-class UpdateViewportEvent extends EditorEvent {
-  final double scale;
-  final Offset offset;
-  UpdateViewportEvent(this.scale, this.offset);
+  @override
+  List<Object?> get props => [node, recordUndo];
 }
 
 class UpdateNodeTransformEvent extends EditorEvent {
@@ -64,71 +95,82 @@ class UpdateNodeTransformEvent extends EditorEvent {
   final double? scaleX;
   final double? scaleY;
   final bool recordUndo;
-  UpdateNodeTransformEvent({
+  const UpdateNodeTransformEvent({
     required this.nodeId,
     this.rotation,
     this.scaleX,
     this.scaleY,
     this.recordUndo = true,
   });
+
+  @override
+  List<Object?> get props => [nodeId, rotation, scaleX, scaleY, recordUndo];
 }
 
 /// Pushes [snapshot] onto the undo stack once (e.g. end of drag/resize/rotate).
 class CommitHistoryEvent extends EditorEvent {
   final DesignDocument snapshot;
-  CommitHistoryEvent(this.snapshot);
+  const CommitHistoryEvent(this.snapshot);
+
+  @override
+  List<Object?> get props => [snapshot];
 }
 
 class AddImageNodeEvent extends EditorEvent {
   final String localPath;
   final String fit;
   final bool select;
-  AddImageNodeEvent(
+  const AddImageNodeEvent(
     this.localPath, {
     this.fit = 'cover',
     this.select = true,
   });
+
+  @override
+  List<Object?> get props => [localPath, fit, select];
 }
 
 class AddTextNodeEvent extends EditorEvent {
   final String text;
   final Offset position;
   final bool select;
-  AddTextNodeEvent(
-    this.text,
-    this.position, {
-    this.select = true,
-  });
+  const AddTextNodeEvent(this.text, this.position, {this.select = true});
+
+  @override
+  List<Object?> get props => [text, position, select];
 }
 
 class DeleteNodeEvent extends EditorEvent {
   final String nodeId;
-  DeleteNodeEvent(this.nodeId);
+  const DeleteNodeEvent(this.nodeId);
+
+  @override
+  List<Object?> get props => [nodeId];
 }
 
-enum LayerReorderAction {
-  bringForward,
-  sendBackward,
-  bringToFront,
-  sendToBack,
-}
+enum LayerReorderAction { bringForward, sendBackward, bringToFront, sendToBack }
 
 class LayerReorderEvent extends EditorEvent {
   final String nodeId;
   final LayerReorderAction action;
-  LayerReorderEvent(this.nodeId, this.action);
+  const LayerReorderEvent(this.nodeId, this.action);
+
+  @override
+  List<Object?> get props => [nodeId, action];
 }
 
-class UndoEvent extends EditorEvent {}
+class UndoEvent extends EditorEvent {
+  const UndoEvent();
+}
 
-class RedoEvent extends EditorEvent {}
+class RedoEvent extends EditorEvent {
+  const RedoEvent();
+}
 
 // --- STATE ---
-class EditorState {
+class EditorState extends Equatable {
   final DesignDocument document;
   final String? selectedNodeId;
-  final double viewportScale;
-  final Offset viewportOffset;
   final List<DesignDocument> undoStack;
   final List<DesignDocument> redoStack;
 
@@ -141,8 +183,6 @@ class EditorState {
   const EditorState({
     required this.document,
     this.selectedNodeId,
-    this.viewportScale = 1.0,
-    this.viewportOffset = Offset.zero,
     this.undoStack = const [],
     this.redoStack = const [],
     this.documentCommitted = false,
@@ -152,28 +192,35 @@ class EditorState {
     DesignDocument? document,
     String? selectedNodeId,
     bool clearSelection = false,
-    double? viewportScale,
-    Offset? viewportOffset,
     List<DesignDocument>? undoStack,
     List<DesignDocument>? redoStack,
     bool documentCommitted = false,
   }) {
     return EditorState(
       document: document ?? this.document,
-      selectedNodeId: clearSelection ? null : (selectedNodeId ?? this.selectedNodeId),
-      viewportScale: viewportScale ?? this.viewportScale,
-      viewportOffset: viewportOffset ?? this.viewportOffset,
+      selectedNodeId: clearSelection
+          ? null
+          : (selectedNodeId ?? this.selectedNodeId),
       undoStack: undoStack ?? this.undoStack,
       redoStack: redoStack ?? this.redoStack,
       documentCommitted: documentCommitted,
     );
   }
+
+  @override
+  List<Object?> get props => [
+    document,
+    selectedNodeId,
+    undoStack,
+    redoStack,
+    documentCommitted,
+  ];
 }
 
 // --- BLOC ---
 class EditorBloc extends Bloc<EditorEvent, EditorState> {
   EditorBloc(DesignDocument initialDoc)
-      : super(EditorState(document: initialDoc)) {
+    : super(EditorState(document: initialDoc)) {
     on<LoadDocumentEvent>(_onLoadDocument);
     on<UpdateNodeFrameEvent>(_onUpdateNodeFrame);
     on<UpdateNodeTextEvent>(_onUpdateNodeText);
@@ -181,7 +228,6 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     on<SetBackgroundImageEvent>(_onSetBackgroundImage);
     on<ClearBackgroundImageEvent>(_onClearBackgroundImage);
     on<SelectNodeEvent>(_onSelectNode);
-    on<UpdateViewportEvent>(_onUpdateViewport);
     on<UpdateNodeEvent>(_onUpdateNode);
     on<UpdateNodeTransformEvent>(_onUpdateNodeTransform);
     on<AddImageNodeEvent>(_onAddImageNode);
@@ -212,7 +258,10 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     emit(EditorState(document: event.document, documentCommitted: true));
   }
 
-  void _onUpdateNodeFrame(UpdateNodeFrameEvent event, Emitter<EditorState> emit) {
+  void _onUpdateNodeFrame(
+    UpdateNodeFrameEvent event,
+    Emitter<EditorState> emit,
+  ) {
     final updatedNodes = state.document.nodes.map((node) {
       if (node.id == event.nodeId) {
         return node.copyWith(frame: event.newFrame);
@@ -242,7 +291,10 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     );
   }
 
-  void _onUpdateBackgroundColor(UpdateBackgroundColorEvent event, Emitter<EditorState> emit) {
+  void _onUpdateBackgroundColor(
+    UpdateBackgroundColorEvent event,
+    Emitter<EditorState> emit,
+  ) {
     final updatedNodes = state.document.nodes.map((node) {
       if (node is BackgroundNode) {
         return node.copyWith(
@@ -260,7 +312,12 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
         0,
         BackgroundNode(
           id: 'bg_node',
-          frame: Rect.fromLTWH(0, 0, state.document.width, state.document.height),
+          frame: Rect.fromLTWH(
+            0,
+            0,
+            state.document.width,
+            state.document.height,
+          ),
           zIndex: 0,
           color: event.colorHex,
         ),
@@ -274,7 +331,10 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     );
   }
 
-  void _onSetBackgroundImage(SetBackgroundImageEvent event, Emitter<EditorState> emit) {
+  void _onSetBackgroundImage(
+    SetBackgroundImageEvent event,
+    Emitter<EditorState> emit,
+  ) {
     final hasLocal = event.localPath != null && event.localPath!.isNotEmpty;
     final hasAsset = event.assetId != null && event.assetId!.isNotEmpty;
     if (!hasLocal && !hasAsset) return;
@@ -294,7 +354,12 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
         0,
         BackgroundNode(
           id: 'bg_node',
-          frame: Rect.fromLTWH(0, 0, state.document.width, state.document.height),
+          frame: Rect.fromLTWH(
+            0,
+            0,
+            state.document.width,
+            state.document.height,
+          ),
           zIndex: 0,
           color: '#FFFFFFFF',
           localPath: hasLocal ? event.localPath : null,
@@ -310,7 +375,10 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     );
   }
 
-  void _onClearBackgroundImage(ClearBackgroundImageEvent event, Emitter<EditorState> emit) {
+  void _onClearBackgroundImage(
+    ClearBackgroundImageEvent event,
+    Emitter<EditorState> emit,
+  ) {
     final updatedNodes = state.document.nodes.map((node) {
       if (node is BackgroundNode) {
         return node.copyWith(localPath: null, assetId: null);
@@ -333,44 +401,48 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     }
   }
 
-  void _onUpdateViewport(UpdateViewportEvent event, Emitter<EditorState> emit) {
-    emit(state.copyWith(
-      viewportScale: event.scale,
-      viewportOffset: event.offset,
-    ));
-  }
-
   void _onUndo(UndoEvent event, Emitter<EditorState> emit) {
     if (state.undoStack.isEmpty) return;
 
     final previousDoc = state.undoStack.last;
-    final remainingUndo = List<DesignDocument>.from(state.undoStack)..removeLast();
-    final newRedo = List<DesignDocument>.from(state.redoStack)..add(state.document);
+    final remainingUndo = List<DesignDocument>.from(state.undoStack)
+      ..removeLast();
+    final newRedo = List<DesignDocument>.from(state.redoStack)
+      ..add(state.document);
 
-    emit(state.copyWith(
-      document: previousDoc,
-      undoStack: remainingUndo,
-      redoStack: newRedo,
-      documentCommitted: true,
-    ));
+    emit(
+      state.copyWith(
+        document: previousDoc,
+        undoStack: remainingUndo,
+        redoStack: newRedo,
+        documentCommitted: true,
+      ),
+    );
   }
 
   void _onRedo(RedoEvent event, Emitter<EditorState> emit) {
     if (state.redoStack.isEmpty) return;
 
     final nextDoc = state.redoStack.last;
-    final remainingRedo = List<DesignDocument>.from(state.redoStack)..removeLast();
-    final newUndo = List<DesignDocument>.from(state.undoStack)..add(state.document);
+    final remainingRedo = List<DesignDocument>.from(state.redoStack)
+      ..removeLast();
+    final newUndo = List<DesignDocument>.from(state.undoStack)
+      ..add(state.document);
 
-    emit(state.copyWith(
-      document: nextDoc,
-      undoStack: newUndo,
-      redoStack: remainingRedo,
-      documentCommitted: true,
-    ));
+    emit(
+      state.copyWith(
+        document: nextDoc,
+        undoStack: newUndo,
+        redoStack: remainingRedo,
+        documentCommitted: true,
+      ),
+    );
   }
 
-  void _onUpdateNodeTransform(UpdateNodeTransformEvent event, Emitter<EditorState> emit) {
+  void _onUpdateNodeTransform(
+    UpdateNodeTransformEvent event,
+    Emitter<EditorState> emit,
+  ) {
     final updatedNodes = state.document.nodes.map((node) {
       if (node.id == event.nodeId) {
         return node.copyWith(
@@ -394,11 +466,13 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
 
     final newUndoStack = List<DesignDocument>.from(state.undoStack)
       ..add(event.snapshot);
-    emit(state.copyWith(
-      undoStack: newUndoStack,
-      redoStack: const [],
-      documentCommitted: true,
-    ));
+    emit(
+      state.copyWith(
+        undoStack: newUndoStack,
+        redoStack: const [],
+        documentCommitted: true,
+      ),
+    );
   }
 
   Future<Size> _getImageSize(String path) async {
@@ -412,9 +486,15 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     return size;
   }
 
-  Future<void> _onAddImageNode(AddImageNodeEvent event, Emitter<EditorState> emit) async {
+  Future<void> _onAddImageNode(
+    AddImageNodeEvent event,
+    Emitter<EditorState> emit,
+  ) async {
     final doc = state.document;
-    final maxZ = doc.nodes.fold<int>(0, (max, n) => n.zIndex > max ? n.zIndex : max);
+    final maxZ = doc.nodes.fold<int>(
+      0,
+      (max, n) => n.zIndex > max ? n.zIndex : max,
+    );
 
     final imageSize = await _getImageSize(event.localPath);
     const maxDimension = 300.0;
@@ -446,7 +526,10 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
 
   void _onAddTextNode(AddTextNodeEvent event, Emitter<EditorState> emit) {
     final doc = state.document;
-    final maxZ = doc.nodes.fold<int>(0, (max, n) => n.zIndex > max ? n.zIndex : max);
+    final maxZ = doc.nodes.fold<int>(
+      0,
+      (max, n) => n.zIndex > max ? n.zIndex : max,
+    );
     final id = 'text_${DateTime.now().millisecondsSinceEpoch}';
     final newNode = TextNode(
       id: id,
@@ -465,7 +548,7 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
   void _onDeleteNode(DeleteNodeEvent event, Emitter<EditorState> emit) {
     final doc = state.document;
     final updatedNodes = doc.nodes.where((n) => n.id != event.nodeId).toList();
-    
+
     final clearSelection = state.selectedNodeId == event.nodeId;
     if (clearSelection) {
       emit(state.copyWith(clearSelection: true));
@@ -475,10 +558,13 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
 
   void _onLayerReorder(LayerReorderEvent event, Emitter<EditorState> emit) {
     final doc = state.document;
-    final bgNode = doc.nodes.cast<DesignNode?>().firstWhere((n) => n is BackgroundNode, orElse: () => null);
+    final bgNode = doc.nodes.cast<DesignNode?>().firstWhere(
+      (n) => n is BackgroundNode,
+      orElse: () => null,
+    );
     final otherNodes = doc.nodes.where((n) => n is! BackgroundNode).toList()
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
-    
+
     final targetIndex = otherNodes.indexWhere((n) => n.id == event.nodeId);
     if (targetIndex == -1) return;
 
@@ -528,23 +614,28 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
     if (newDoc == state.document) return;
 
     if (!recordUndo) {
-      emit(state.copyWith(
-        document: newDoc,
-        selectedNodeId: selectNodeId,
-        clearSelection: clearSelection,
-        documentCommitted: false,
-      ));
+      emit(
+        state.copyWith(
+          document: newDoc,
+          selectedNodeId: selectNodeId,
+          clearSelection: clearSelection,
+          documentCommitted: false,
+        ),
+      );
       return;
     }
 
-    final newUndoStack = List<DesignDocument>.from(state.undoStack)..add(state.document);
-    emit(state.copyWith(
-      document: newDoc,
-      undoStack: newUndoStack,
-      redoStack: const [], // Clear redo history on new action
-      selectedNodeId: selectNodeId,
-      clearSelection: clearSelection,
-      documentCommitted: true,
-    ));
+    final newUndoStack = List<DesignDocument>.from(state.undoStack)
+      ..add(state.document);
+    emit(
+      state.copyWith(
+        document: newDoc,
+        undoStack: newUndoStack,
+        redoStack: const [], // Clear redo history on new action
+        selectedNodeId: selectNodeId,
+        clearSelection: clearSelection,
+        documentCommitted: true,
+      ),
+    );
   }
 }

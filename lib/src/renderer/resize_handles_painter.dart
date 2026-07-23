@@ -40,7 +40,11 @@ class ResizeHandlesPainter extends CustomPainter {
         Offset(screenFrame.right, screenFrame.center.dy),
       ];
       for (final side in sides) {
-        final rect = Rect.fromCenter(center: side, width: handleSize, height: handleSize);
+        final rect = Rect.fromCenter(
+          center: side,
+          width: handleSize,
+          height: handleSize,
+        );
         canvas.drawRect(rect, handlePaint);
         canvas.drawRect(rect, handleBorderPaint);
       }
@@ -53,7 +57,11 @@ class ResizeHandlesPainter extends CustomPainter {
       ];
 
       for (final corner in corners) {
-        final rect = Rect.fromCenter(center: corner, width: handleSize, height: handleSize);
+        final rect = Rect.fromCenter(
+          center: corner,
+          width: handleSize,
+          height: handleSize,
+        );
         canvas.drawRect(rect, handlePaint);
         canvas.drawRect(rect, handleBorderPaint);
       }

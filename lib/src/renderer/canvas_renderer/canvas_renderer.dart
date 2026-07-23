@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../document/document_color.dart';
 import '../../document/models/design_document.dart';
 
 class CanvasRenderer {
@@ -82,7 +83,12 @@ class CanvasRenderer {
     return picture.toImage(doc.width.toInt(), doc.height.toInt());
   }
 
-  static void _drawImage(Canvas canvas, ui.Image image, Rect destRect, String fit) {
+  static void _drawImage(
+    Canvas canvas,
+    ui.Image image,
+    Rect destRect,
+    String fit,
+  ) {
     final srcSize = Size(image.width.toDouble(), image.height.toDouble());
     final destSize = destRect.size;
 
@@ -110,21 +116,10 @@ class CanvasRenderer {
       srcRect = Rect.fromLTWH(0, 0, srcSize.width, srcSize.height);
     }
 
-    canvas.drawImageRect(
-      image,
-      srcRect,
-      destRect,
-      Paint()..isAntiAlias = true,
-    );
+    canvas.drawImageRect(image, srcRect, destRect, Paint()..isAntiAlias = true);
   }
 
-  static Color _parseHexColor(String hex) {
-    String formatted = hex.replaceAll('#', '');
-    if (formatted.length == 6) {
-      formatted = 'FF$formatted';
-    }
-    return Color(int.parse(formatted, radix: 16));
-  }
+  static Color _parseHexColor(String hex) => decodeDocumentColor(hex);
 
   static FontWeight _getFontWeight(int weight) {
     switch (weight) {

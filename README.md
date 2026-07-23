@@ -1,4 +1,8 @@
+![Canvas Editor](preview/banner.png)
+
 # Canvas Editor (`flutter_canvas_editor`)
+
+[![flutter_canvas_editor](https://img.shields.io/pub/v/flutter_canvas_editor?label=flutter_canvas_editor)](https://pub.dev/packages/flutter_canvas_editor)
 
 A high-performance, design-tool-style canvas template editor engine for Flutter. It provides an embedded editor canvas widget, a clean controller interface, reactive state streams, customizable selection borders/handles, layer ordering, undo/redo history, text reflow, background fill (color and image), callback-based image loading, dynamic custom node extension, and pixel-identical PNG export.
 
@@ -12,7 +16,7 @@ The library owns the **canvas engine only** — toolbars, insert bars, property 
 
 ```yaml
 dependencies:
-  flutter_canvas_editor: ^1.0.0
+  flutter_canvas_editor: ^1.1.0
 ```
 
 Then:
@@ -248,9 +252,9 @@ _controller = CanvasEditorController({
 | Parameter | Purpose |
 |---|---|
 | `initialDocument` | Starting canvas state. Defaults to a 1080×1080 white background. |
-| `imageProvider` | Resolves `assetId` references to `ImageProvider` instances (see [Image Loading](#image-loading)). |
-| `customNodeTypes` | Registers consumer-defined node types at startup. |
-| `onDocumentChanged` | Fires when a Design Document change is **committed** (same moments as undo: gesture end, add/delete, style commit, undo/redo, load). Mid-drag/resize/rotate updates go to `stateStream` only. |
+| `imageProvider` | Required only for `assetId` / remote / bundled assets (see [Image Loading](#image-loading)). Optional for `localPath`-only Hosts. |
+| `customNodeTypes` | Registers consumer-defined node types on this Controller only. |
+| `onDocumentChanged` | Fires when a Design Document change is **committed** (same moments as undo: gesture end, add/delete, style commit, undo/redo, load). Mid-drag/resize/rotate updates go to `stateStream` only. Use for Host dirty/autosave — not undo depth. |
 
 ### Read API
 
@@ -267,7 +271,8 @@ Stream<CanvasEditorState> get stateStream;
 | `document` | Current `DesignDocument` snapshot |
 | `selectedNode` | Selected `DesignNode`, or `null` |
 | `canUndo` / `canRedo` | Whether history navigation is available |
-| `hasUnsavedChanges` | `true` when the undo stack is non-empty |
+
+Persistence dirty state is **Host-owned**. Prefer `onDocumentChanged` (Committed Changes) — do not treat undo-stack depth as “unsaved.” (`hasUnsavedChanges` is deprecated and will be removed in 2.0.)
 
 ### Selection
 
@@ -292,8 +297,8 @@ Text updates automatically **reflow** — frame height adjusts to fit wrapped te
 controller.updateTextStyle(
   nodeId, {
   double? fontSize,
-  String? textColor,      // ARGB hex, e.g. '#FF000000'
-  String? fontFamily,
+  String? textColor,      // ARGB hex, e.g. '#FF000000' — see Document Color helpers
+  String? fontFamily,     // Host-registered face; null = platform default
   int? fontWeight,        // e.g. 400, 700
   double? lineHeight,
   double? letterSpacing,
@@ -304,16 +309,34 @@ controller.updateTextStyle(
 controller.updateTextContent(nodeId, String text, {bool recordUndo = true});
 ```
 
+### Document Color helpers
+
+Controller mutators keep Document Color as `#AARRGGBB` hex. Convert at the Host UI boundary:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
+
+// Colour picker → Controller
+final hex = encodeDocumentColor(pickedColor);
+controller.updateBackground(hex);
+controller.updateTextStyle(nodeId, textColor: hex);
+
+// Design Document → Colour picker
+final color = decodeDocumentColor(node.textColor);
+```
+
 ### Background
 
 ```dart
+// Replace-fill: sets solid color and clears any Background Fill image
 controller.updateBackground('#FFFFFFFF', {bool recordUndo = true});
 
 // Set a background image (localPath and assetId are exclusive)
 controller.setBackgroundImage(localPath: '/path/to/photo.jpg');
 controller.setBackgroundImage(assetId: 'https://cdn.example.com/bg.png');
 
-// Restore dormant background colour
+// Restore dormant background colour (keeps the last solid color)
 controller.clearBackgroundImage();
 ```
 
@@ -372,13 +395,15 @@ Export uses the same rendering pipeline as the live canvas, so output is pixel-i
 
 ## Built-in Canvas Interactions
 
-The canvas widget handles these gestures out of the box — no extra wiring required:
+The canvas **fits to its parent** (letterboxed). There is no Host zoom/pan or viewport Controller API.
+
+Gestures out of the box — no extra wiring required:
 
 | Gesture | Behaviour |
 |---|---|
 | Tap empty area | Deselect |
 | Tap node | Select |
-| Tap selected text node | Start inline text editing |
+| Tap selected text node again | Start inline text editing |
 | Drag node | Move |
 | Corner handles (image / custom nodes) | Resize (all corners) |
 | Side handles (text nodes) | Horizontal resize only (design-tool-style); height reflows to fit wrapped text |
@@ -388,15 +413,50 @@ Text nodes use **horizontal-only resize handles** on the left and right sides. W
 
 ---
 
+## Platform support
+
+| Platform | Status |
+|---|---|
+| Android | ✅ |
+| iOS | ✅ |
+| macOS | ✅ |
+| Windows | ✅ |
+| Linux | ✅ |
+| Web | ❌ (deferred — see `docs/web-support-requirements.md`) |
+
+---
+
+## Fonts
+
+The Engine does **not** bundle fonts. New Text Nodes default to the **platform face** (`fontFamily: null`). If you store a custom Node Font Family on the Design Document, register that family in the Host app (e.g. `pubspec.yaml` `fonts:`).
+
+---
+
 ## Image Loading
 
-Images are referenced by `localPath` (device file) and/or `assetId` (opaque ID resolved by the consumer). The engine tries `localPath` first, then falls back to `imageProvider`.
+Images are referenced by `localPath` (device file) and/or `assetId` (opaque ID resolved by the Host). The Engine tries `localPath` first, then falls back to `imageProvider`.
+
+**`imageProvider` is required only for `assetId` / remote / bundled assets.** Gallery `localPath`-only Hosts can omit it — do not register a no-op callback “just in case.”
 
 ```dart
+// localPath-only Hosts: omit imageProvider entirely
+CanvasEditorController(initialDocument: doc);
+
+// Mixed sources — one callback branches file / network / internal asset
 CanvasEditorController(
   imageProvider: (CanvasImageReference ref) {
-    if (ref.assetId != null) return NetworkImage(ref.assetId!);
-    return const AssetImage('assets/placeholder.png');
+    final id = ref.assetId;
+    if (id == null || id.isEmpty) {
+      throw ArgumentError('assetId required when localPath is unresolved');
+    }
+    // Host convention: opaque assetId prefixes
+    if (id.startsWith('http://') || id.startsWith('https://')) {
+      return NetworkImage(id);
+    }
+    if (id.startsWith('asset:')) {
+      return AssetImage(id.substring('asset:'.length));
+    }
+    return NetworkImage(id); // or your CDN / catalog lookup
   },
 );
 ```
@@ -431,6 +491,8 @@ double scaleY;
 
 ### Registering Custom Nodes
 
+Custom Node types are **scoped per Controller** (pass `customNodeTypes` at construct). Deserialize with that registry:
+
 ```dart
 final customNodeTypes = [
   CustomNodeType<MyBadge>(
@@ -441,9 +503,15 @@ final customNodeTypes = [
 ];
 
 final controller = CanvasEditorController(customNodeTypes: customNodeTypes);
+
+// Parse JSON against this Controller's registry
+final doc = controller.documentFromJson(jsonMap);
+// or: DesignDocument.fromJson(jsonMap, customNodes: controller.customNodeRegistry);
 ```
 
-Custom node types participate in serialization (`DesignDocument.fromJson` dispatches by `type`), rendering, and transforms.
+Static `CustomNodeRegistry.register` / `registerAll` are deprecated (removed in 2.0).
+
+Custom node types participate in serialization, rendering, and transforms.
 
 ---
 
@@ -478,13 +546,20 @@ The barrel file `package:flutter_canvas_editor/flutter_canvas_editor.dart` expor
 | `CanvasEditorWidget` | Embeddable canvas widget |
 | `CanvasTheme` | Selection handle / border theming |
 | `DesignDocument`, `DesignNode`, `TextNode`, `ImageNode`, `BackgroundNode` | Document model |
-| `CustomNodeType`, `CustomNodeRegistry` | Node extension registry |
+| `encodeDocumentColor`, `decodeDocumentColor` | Flutter `Color` ↔ Document Color hex |
+| `CustomNodeType`, `CustomNodeRegistry` | Per-Controller node extension registry |
 | `CoordinateSystem` | Doc ↔ screen mapping for custom overlays (most Hosts can ignore) |
 | `CanvasImageReference`, `CanvasImageLoader`, `CanvasImageProvider` | Image load path |
 
 Use [CanvasEditorWidget] — do not call `CanvasEditorController.buildCanvas` from Host UI.
 
 Internal implementation (`EditorBloc`, painters, hit-testing) is private under `lib/src/` and not part of the public API.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
@@ -495,11 +570,11 @@ Internal implementation (`EditorBloc`, painters, hit-testing) is private under `
 3. **Document manipulation** — add/delete text and image nodes, update styles, background colour and image
 4. **Text reflow** — automatic height adjustment when content or width changes
 5. **design-tool-style text resize** — horizontal side handles only; height follows wrapped text
-6. **Inline text editing** — double-tap a selected text node to edit on canvas
+6. **Inline text editing** — tap a selected text node again to edit on canvas
 7. **Drag, resize, rotate** — built-in gesture handling with rotation anchor
 8. **Layer reordering** — bring forward / send backward / to front / to back
 9. **Undo / redo** — with history session coalescing for live property controls
 10. **Callback image loading** — `localPath` + `assetId` with consumer-provided resolver
-11. **Custom node registry** — extend the canvas with your own widgets and serializers
+11. **Custom node registry** — per-Controller extension with widgets and serializers
 12. **Pixel-identical PNG export** — same renderer as the live canvas
 13. **JSON serialization** — `DesignDocument.toJson()` / `fromJson()` for persistence and sync

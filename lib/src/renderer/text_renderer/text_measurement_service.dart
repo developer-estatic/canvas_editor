@@ -7,7 +7,7 @@ class TextMeasurementService {
   /// Measures the size of a text block given style properties and a maximum width constraint.
   static Size measureText({
     required String text,
-    required String fontFamily,
+    String? fontFamily,
     required double fontSize,
     required int fontWeight,
     required double lineHeight,

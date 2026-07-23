@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../document/document_color.dart';
 import '../document/models/design_document.dart';
 import '../shared/image_load_path.dart';
 import '../renderer/coordinate_system.dart';
@@ -12,6 +13,7 @@ class CanvasPainter extends CustomPainter {
   final CoordinateSystem coords;
   final Map<String, ui.Image> imageCache;
   final CanvasTheme theme;
+
   /// Used to size selection supersampling to the screen's physical pixels.
   final double devicePixelRatio;
 
@@ -137,11 +139,8 @@ class CanvasPainter extends CustomPainter {
   }
 
   Rect _selectionOverlayBounds(Rect screenRect, double rotationDeg) {
-    final pad = math.max(
-          theme.handleSize,
-          theme.selectionBorderWidth,
-        ) /
-        2 +
+    final pad =
+        math.max(theme.handleSize, theme.selectionBorderWidth) / 2 +
         _rotationHandleReach +
         _rotationHandleRadius +
         _softEdgeExtra +
@@ -166,7 +165,9 @@ class CanvasPainter extends CustomPainter {
       transform(screenRect.bottomLeft),
       transform(screenRect.bottomRight),
       // Rotation stem tip (above top-center in local space).
-      transform(Offset(screenRect.center.dx, screenRect.top - _rotationHandleReach)),
+      transform(
+        Offset(screenRect.center.dx, screenRect.top - _rotationHandleReach),
+      ),
     ];
 
     var minX = points.first.dx;
@@ -182,11 +183,7 @@ class CanvasPainter extends CustomPainter {
     return Rect.fromLTRB(minX - pad, minY - pad, maxX + pad, maxY + pad);
   }
 
-  void _paintSelectionChrome(
-    Canvas canvas,
-    DesignNode node,
-    Rect screenRect,
-  ) {
+  void _paintSelectionChrome(Canvas canvas, DesignNode node, Rect screenRect) {
     final center = screenRect.center;
     final handleSize = theme.handleSize;
     final stroke = theme.selectionBorderWidth;
@@ -201,7 +198,12 @@ class CanvasPainter extends CustomPainter {
       ..color = theme.selectionBorderColor.withValues(alpha: 0.28)
       ..style = PaintingStyle.fill
       ..isAntiAlias = true;
-    _drawFilledStrokeRect(canvas, screenRect, stroke + _softEdgeExtra, softPaint);
+    _drawFilledStrokeRect(
+      canvas,
+      screenRect,
+      stroke + _softEdgeExtra,
+      softPaint,
+    );
 
     final fillPaint = Paint()
       ..color = theme.selectionBorderColor
@@ -240,8 +242,10 @@ class CanvasPainter extends CustomPainter {
     }
 
     final topCenter = Offset(screenRect.center.dx, screenRect.top);
-    final rotHandleCenter =
-        Offset(topCenter.dx, topCenter.dy - _rotationHandleReach);
+    final rotHandleCenter = Offset(
+      topCenter.dx,
+      topCenter.dy - _rotationHandleReach,
+    );
     final stemPaint = Paint()
       ..color = theme.effectiveRotationHandleColor
       ..style = PaintingStyle.fill
@@ -364,7 +368,10 @@ class CanvasHitTest {
     final localY = dx * sinA + dy * cosA;
     final halfW = screenRect.width / 2;
     final halfH = screenRect.height / 2;
-    return localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH;
+    return localX >= -halfW &&
+        localX <= halfW &&
+        localY >= -halfH &&
+        localY <= halfH;
   }
 
   static String? hitTestSideHandle(
@@ -384,10 +391,7 @@ class CanvasHitTest {
     final sinA = math.sin(-angleRad);
     final localPt = Offset(dx * cosA - dy * sinA, dx * sinA + dy * cosA);
     final halfW = screenRect.width / 2;
-    final positions = <Offset>[
-      Offset(-halfW, 0),
-      Offset(halfW, 0),
-    ];
+    final positions = <Offset>[Offset(-halfW, 0), Offset(halfW, 0)];
     for (int i = 0; i < 2; i++) {
       if ((localPt - positions[i]).distance <= handleHitRadius) {
         return i == 0 ? 'ml' : 'mr';
@@ -433,10 +437,14 @@ class CanvasHitTest {
     for (int i = 0; i < 4; i++) {
       if ((localPt - positions[i]).distance <= handleHitRadius) {
         switch (i) {
-          case 0: return 'tl';
-          case 1: return 'tr';
-          case 2: return 'bl';
-          case 3: return 'br';
+          case 0:
+            return 'tl';
+          case 1:
+            return 'tr';
+          case 2:
+            return 'bl';
+          case 3:
+            return 'br';
         }
       }
     }
@@ -463,31 +471,40 @@ class CanvasHitTest {
   }
 }
 
-Color _parseHex(String hex) {
-  var h = hex.replaceAll('#', '');
-  if (h.length == 6) h = 'FF$h';
-  return Color(int.parse(h, radix: 16));
-}
+Color _parseHex(String hex) => decodeDocumentColor(hex);
 
 FontWeight _fontWeight(int w) {
   switch (w) {
-    case 100: return FontWeight.w100;
-    case 200: return FontWeight.w200;
-    case 300: return FontWeight.w300;
-    case 400: return FontWeight.normal;
-    case 500: return FontWeight.w500;
-    case 600: return FontWeight.w600;
-    case 700: return FontWeight.bold;
-    case 800: return FontWeight.w800;
-    case 900: return FontWeight.w900;
-    default: return FontWeight.normal;
+    case 100:
+      return FontWeight.w100;
+    case 200:
+      return FontWeight.w200;
+    case 300:
+      return FontWeight.w300;
+    case 400:
+      return FontWeight.normal;
+    case 500:
+      return FontWeight.w500;
+    case 600:
+      return FontWeight.w600;
+    case 700:
+      return FontWeight.bold;
+    case 800:
+      return FontWeight.w800;
+    case 900:
+      return FontWeight.w900;
+    default:
+      return FontWeight.normal;
   }
 }
 
 TextAlign _textAlign(String a) {
   switch (a) {
-    case 'center': return TextAlign.center;
-    case 'right': return TextAlign.right;
-    default: return TextAlign.left;
+    case 'center':
+      return TextAlign.center;
+    case 'right':
+      return TextAlign.right;
+    default:
+      return TextAlign.left;
   }
 }

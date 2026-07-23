@@ -34,10 +34,10 @@ abstract class DesignNode {
   Map<String, dynamic> toJson();
 
   Map<String, dynamic> _transformToJson() => {
-        'rotation': rotation,
-        'scaleX': scaleX,
-        'scaleY': scaleY,
-      };
+    'rotation': rotation,
+    'scaleX': scaleX,
+    'scaleY': scaleY,
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -64,16 +64,24 @@ abstract class DesignNode {
 }
 
 /// Editable text Node. Default [fontSize] is 48.
+///
+/// [fontFamily] defaults to `null` (platform default). The Engine does not
+/// bundle fonts — Hosts must register any custom Node Font Family they store.
 class TextNode extends DesignNode {
   final String text;
-  final String fontFamily;
+
+  /// Node Font Family name, or `null` for the platform default face.
+  final String? fontFamily;
   final double fontSize;
+
   /// Font weight as CSS-style number (e.g. 400, 700).
   final int fontWeight;
   final double lineHeight;
   final double letterSpacing;
+
   /// ARGB hex, e.g. `'#FF000000'`.
   final String textColor;
+
   /// `'left'`, `'center'`, or `'right'`.
   final String textAlign;
 
@@ -85,7 +93,7 @@ class TextNode extends DesignNode {
     super.scaleX,
     super.scaleY,
     required this.text,
-    this.fontFamily = 'Inter',
+    this.fontFamily,
     this.fontSize = 48.0,
     this.fontWeight = 400,
     this.lineHeight = 1.2,
@@ -130,32 +138,38 @@ class TextNode extends DesignNode {
 
   @override
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'frame': {
-          'x': frame.left,
-          'y': frame.top,
-          'width': frame.width,
-          'height': frame.height,
-        },
-        'text': text,
-        'style': {
-          'fontFamily': fontFamily,
-          'fontSize': fontSize,
-          'fontWeight': fontWeight,
-          'lineHeight': lineHeight,
-          'letterSpacing': letterSpacing,
-          'textColor': textColor,
-          'textAlign': textAlign,
-        },
-        'transform': _transformToJson(),
-        'zIndex': zIndex,
-      };
+    'id': id,
+    'type': type,
+    'frame': {
+      'x': frame.left,
+      'y': frame.top,
+      'width': frame.width,
+      'height': frame.height,
+    },
+    'text': text,
+    'style': {
+      'fontFamily': fontFamily,
+      'fontSize': fontSize,
+      'fontWeight': fontWeight,
+      'lineHeight': lineHeight,
+      'letterSpacing': letterSpacing,
+      'textColor': textColor,
+      'textAlign': textAlign,
+    },
+    'transform': _transformToJson(),
+    'zIndex': zIndex,
+  };
 
   factory TextNode.fromJson(Map<String, dynamic> json) {
-    final frameMap = json['frame'] as Map<String, dynamic>;
-    final styleMap = json['style'] as Map<String, dynamic>? ?? {};
-    final transformMap = json['transform'] as Map<String, dynamic>?;
+    final frameMap = Map<String, dynamic>.from(json['frame'] as Map);
+    final styleRaw = json['style'];
+    final styleMap = styleRaw is Map
+        ? Map<String, dynamic>.from(styleRaw)
+        : <String, dynamic>{};
+    final transformRaw = json['transform'];
+    final transformMap = transformRaw is Map
+        ? Map<String, dynamic>.from(transformRaw)
+        : null;
     return TextNode(
       id: json['id'] as String,
       frame: Rect.fromLTWH(
@@ -169,7 +183,7 @@ class TextNode extends DesignNode {
       scaleX: (transformMap?['scaleX'] as num? ?? 1).toDouble(),
       scaleY: (transformMap?['scaleY'] as num? ?? 1).toDouble(),
       text: json['text'] as String,
-      fontFamily: styleMap['fontFamily'] as String? ?? 'Inter',
+      fontFamily: styleMap['fontFamily'] as String?,
       fontSize: (styleMap['fontSize'] as num? ?? 48.0).toDouble(),
       fontWeight: styleMap['fontWeight'] as int? ?? 400,
       lineHeight: (styleMap['lineHeight'] as num? ?? 1.2).toDouble(),
@@ -205,12 +219,11 @@ class TextNode extends DesignNode {
       textAlign.hashCode;
 }
 
-
-
 /// Image Node backed by a local file and/or Host-resolved [assetId].
 class ImageNode extends DesignNode {
   final String? assetId;
   final String? localPath;
+
   /// Box-fit style: `'cover'`, `'contain'`, or `'fill'`.
   final String fit;
 
@@ -252,20 +265,20 @@ class ImageNode extends DesignNode {
 
   @override
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'frame': {
-          'x': frame.left,
-          'y': frame.top,
-          'width': frame.width,
-          'height': frame.height,
-        },
-        'assetId': assetId,
-        'localPath': localPath,
-        'fit': fit,
-        'transform': _transformToJson(),
-        'zIndex': zIndex,
-      };
+    'id': id,
+    'type': type,
+    'frame': {
+      'x': frame.left,
+      'y': frame.top,
+      'width': frame.width,
+      'height': frame.height,
+    },
+    'assetId': assetId,
+    'localPath': localPath,
+    'fit': fit,
+    'transform': _transformToJson(),
+    'zIndex': zIndex,
+  };
 
   factory ImageNode.fromJson(Map<String, dynamic> json) {
     final frameMap = json['frame'] as Map<String, dynamic>;
@@ -297,10 +310,9 @@ class ImageNode extends DesignNode {
       fit == other.fit;
 
   @override
-  int get hashCode => super.hashCode ^ assetId.hashCode ^ localPath.hashCode ^ fit.hashCode;
+  int get hashCode =>
+      super.hashCode ^ assetId.hashCode ^ localPath.hashCode ^ fit.hashCode;
 }
-
-
 
 /// Background Fill stored as a node. Not selectable via hit-testing; use product
 /// language "background fill" in Host UI, not "background node".
@@ -353,20 +365,20 @@ class BackgroundNode extends DesignNode {
 
   @override
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'type': type,
-        'frame': {
-          'x': frame.left,
-          'y': frame.top,
-          'width': frame.width,
-          'height': frame.height,
-        },
-        'color': color,
-        if (assetId != null) 'assetId': assetId,
-        if (localPath != null) 'localPath': localPath,
-        'transform': _transformToJson(),
-        'zIndex': zIndex,
-      };
+    'id': id,
+    'type': type,
+    'frame': {
+      'x': frame.left,
+      'y': frame.top,
+      'width': frame.width,
+      'height': frame.height,
+    },
+    'color': color,
+    if (assetId != null) 'assetId': assetId,
+    if (localPath != null) 'localPath': localPath,
+    'transform': _transformToJson(),
+    'zIndex': zIndex,
+  };
 
   factory BackgroundNode.fromJson(Map<String, dynamic> json) {
     final frameMap = json['frame'] as Map<String, dynamic>;
@@ -402,14 +414,14 @@ class BackgroundNode extends DesignNode {
       super.hashCode ^ color.hashCode ^ assetId.hashCode ^ localPath.hashCode;
 }
 
-
-
 /// Persisted canvas content: size plus ordered [nodes] (JSON-serializable).
 class DesignDocument {
   final String id;
   final int version;
+
   /// Document width in document units.
   final double width;
+
   /// Document height in document units.
   final double height;
   final List<DesignNode> nodes;
@@ -439,14 +451,23 @@ class DesignDocument {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'version': version,
-        'width': width,
-        'height': height,
-        'nodes': nodes.map((node) => node.toJson()).toList(),
-      };
+    'id': id,
+    'version': version,
+    'width': width,
+    'height': height,
+    'nodes': nodes.map((node) => node.toJson()).toList(),
+  };
 
-  factory DesignDocument.fromJson(Map<String, dynamic> json) {
+  /// Deserializes a Design Document.
+  ///
+  /// Pass [customNodes] (typically from [CanvasEditorController.customNodeRegistry])
+  /// so custom Node types resolve against the Controller-scoped registry.
+  /// When omitted, the deprecated process-global registry is consulted for
+  /// 1.x compatibility.
+  factory DesignDocument.fromJson(
+    Map<String, dynamic> json, {
+    CustomNodeRegistry? customNodes,
+  }) {
     final nodesJson = json['nodes'] as List<dynamic>? ?? [];
     final nodesList = <DesignNode>[];
     for (final nodeMap in nodesJson) {
@@ -459,7 +480,10 @@ class DesignDocument {
       } else if (type == 'background') {
         nodesList.add(BackgroundNode.fromJson(map));
       } else {
-        final customType = CustomNodeRegistry.get(type);
+        final customType =
+            customNodes?.resolve(type) ??
+            // ignore: deprecated_member_use_from_same_package
+            CustomNodeRegistry.get(type);
         if (customType != null) {
           nodesList.add(customType.fromJson(map));
         }
@@ -487,7 +511,11 @@ class DesignDocument {
 
   @override
   int get hashCode =>
-      id.hashCode ^ version.hashCode ^ width.hashCode ^ height.hashCode ^ nodes.hashCode;
+      id.hashCode ^
+      version.hashCode ^
+      width.hashCode ^
+      height.hashCode ^
+      nodes.hashCode;
 
   bool _listEquals<T>(List<T> a, List<T> b) {
     if (a.length != b.length) return false;

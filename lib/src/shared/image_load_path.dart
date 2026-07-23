@@ -69,9 +69,7 @@ abstract final class CanvasImageLoader {
       }
     }
 
-    if (ref.assetId == null ||
-        ref.assetId!.isEmpty ||
-        imageProvider == null) {
+    if (ref.assetId == null || ref.assetId!.isEmpty || imageProvider == null) {
       return null;
     }
 
@@ -106,7 +104,8 @@ abstract final class CanvasImageLoader {
     final refs = <CanvasImageReference>[];
 
     for (final node in document.nodes) {
-      if (node is ImageNode && !CanvasImageReference.fromImageNode(node).isEmpty) {
+      if (node is ImageNode &&
+          !CanvasImageReference.fromImageNode(node).isEmpty) {
         refs.add(CanvasImageReference.fromImageNode(node));
       } else if (node is BackgroundNode && node.hasBackgroundImage) {
         refs.add(CanvasImageReference.fromBackgroundNode(node));
