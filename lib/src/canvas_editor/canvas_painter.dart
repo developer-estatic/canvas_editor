@@ -17,6 +17,10 @@ class CanvasPainter extends CustomPainter {
   /// Used to size selection supersampling to the screen's physical pixels.
   final double devicePixelRatio;
 
+  /// Text node currently edited in place. Its glyphs are drawn by the
+  /// overlay field, so the canvas must not paint a second copy underneath.
+  final String? editingNodeId;
+
   CanvasPainter({
     required this.document,
     required this.coords,
@@ -24,6 +28,7 @@ class CanvasPainter extends CustomPainter {
     this.imageCache = const {},
     this.theme = const CanvasTheme(),
     this.devicePixelRatio = 1.0,
+    this.editingNodeId,
   });
 
   @override
@@ -63,7 +68,7 @@ class CanvasPainter extends CustomPainter {
 
     if (node is BackgroundNode) {
       _drawBackground(canvas, node, screenRect);
-    } else if (node is TextNode) {
+    } else if (node is TextNode && node.id != editingNodeId) {
       final textStyle = TextStyle(
         color: _parseHex(node.textColor),
         fontFamily: node.fontFamily,
@@ -332,7 +337,8 @@ class CanvasPainter extends CustomPainter {
       old.coords.viewportScale != coords.viewportScale ||
       old.coords.viewportOffset != coords.viewportOffset ||
       old.devicePixelRatio != devicePixelRatio ||
-      old.theme != theme;
+      old.theme != theme ||
+      old.editingNodeId != editingNodeId;
 }
 
 /// Hit-test utilities for the canvas editor.

@@ -1,16 +1,17 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
 
 import '../document/models/design_document.dart';
+import 'local_file_bytes.dart';
 
 /// Portable image reference: local file path and/or Host [assetId].
 class CanvasImageReference {
   const CanvasImageReference({this.localPath, this.assetId});
 
-  /// Absolute or app-relative file path. Preferred over [assetId] when both set.
+  /// Absolute or app-relative file path on IO platforms. Preferred over
+  /// [assetId] when both are set. Ignored on web (no file system); use [assetId].
   final String? localPath;
 
   /// Host-defined id (URL, asset key, etc.) resolved via [CanvasImageProvider].
@@ -47,8 +48,11 @@ typedef CanvasImageProvider = ImageProvider Function(CanvasImageReference ref);
 
 /// Resolves image pixels for the live canvas and PNG export.
 ///
-/// Prefers [CanvasImageReference.localPath], then [CanvasImageProvider] for
-/// [CanvasImageReference.assetId].
+/// Prefers [CanvasImageReference.localPath] on IO platforms, then
+/// [CanvasImageProvider] for [CanvasImageReference.assetId].
+///
+/// On web, [localPath] cannot be read. Hosts should set [assetId] and
+/// [imageProvider] (`NetworkImage`, `AssetImage`, or `MemoryImage`).
 abstract final class CanvasImageLoader {
   /// Loads a single image, or `null` if it cannot be resolved.
   static Future<ui.Image?> resolveToUiImage({
@@ -57,9 +61,8 @@ abstract final class CanvasImageLoader {
   }) async {
     if (ref.localPath != null && ref.localPath!.isNotEmpty) {
       try {
-        final file = File(ref.localPath!);
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
+        final bytes = await readLocalFileBytes(ref.localPath!);
+        if (bytes != null) {
           final codec = await ui.instantiateImageCodec(bytes);
           final frame = await codec.getNextFrame();
           return frame.image;
@@ -89,7 +92,7 @@ abstract final class CanvasImageLoader {
         },
       );
       stream.addListener(listener);
-      return completer.future;
+      return await completer.future;
     } catch (_) {
       return null;
     }

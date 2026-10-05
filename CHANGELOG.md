@@ -1,3 +1,15 @@
+## 1.2.0
+
+### Added
+- Web support. The engine compiles and runs in the browser. Resolve images with `assetId` and `imageProvider` (`NetworkImage`, `AssetImage`, or `MemoryImage`). `localPath` file reads stay on Android, iOS, and desktop.
+
+### Fixed
+- Inline text editing no longer paints the node twice. The canvas hides that node's glyphs while the field is open, and the field uses the node's font, size, line height, and letter spacing instead of the Host theme.
+- Image loading awaits the decoded frame so a failed asset resolve is caught instead of returned as an unawaited `Future`.
+
+### Changed
+- `equatable` constraint is `^3.0.0`.
+
 ## 1.1.0
 
 ### Added

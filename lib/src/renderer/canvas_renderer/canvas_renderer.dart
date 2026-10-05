@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../document/document_color.dart';
 import '../../document/models/design_document.dart';
+import '../../shared/local_file_bytes.dart';
 
 class CanvasRenderer {
   /// Renders the design document to an offscreen image matching the exact document dimension size
@@ -51,16 +51,13 @@ class CanvasRenderer {
         textPainter.layout(maxWidth: node.frame.width);
         textPainter.paint(canvas, Offset(node.frame.left, node.frame.top));
       } else if (node is ImageNode) {
-        if (node.localPath != null && node.localPath!.isNotEmpty) {
-          final file = File(node.localPath!);
-          if (await file.exists()) {
-            final bytes = await file.readAsBytes();
-            final codec = await ui.instantiateImageCodec(bytes);
-            final frame = await codec.getNextFrame();
-            final uiImage = frame.image;
-
-            _drawImage(canvas, uiImage, node.frame, node.fit);
-          }
+        final bytes = node.localPath != null && node.localPath!.isNotEmpty
+            ? await readLocalFileBytes(node.localPath!)
+            : null;
+        if (bytes != null) {
+          final codec = await ui.instantiateImageCodec(bytes);
+          final frame = await codec.getNextFrame();
+          _drawImage(canvas, frame.image, node.frame, node.fit);
         } else {
           // If no image is provided, draw a simple placeholder
           final paint = Paint()

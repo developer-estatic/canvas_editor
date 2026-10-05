@@ -9,7 +9,8 @@ From the package root:
 ```bash
 cd example
 flutter pub get
-flutter run
+flutter run          # mobile / desktop
+flutter run -d chrome
 ```
 
 ## What it shows

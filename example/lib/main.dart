@@ -1,7 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter_canvas_editor/flutter_canvas_editor.dart';
 import 'package:flutter/material.dart';
+
+import 'io_file_image.dart';
 
 void main() => runApp(const CanvasEditorExampleApp());
 
@@ -79,7 +79,8 @@ class _CanvasDemoScreenState extends State<CanvasDemoScreen> {
   /// the file branch here covers export/precache paths that still invoke the provider.
   ImageProvider _exampleImageProvider(CanvasImageReference ref) {
     if (ref.localPath != null && ref.localPath!.isNotEmpty) {
-      return FileImage(File(ref.localPath!));
+      final fileImage = createFileImage(ref.localPath!);
+      if (fileImage != null) return fileImage;
     }
     final id = ref.assetId;
     if (id == null || id.isEmpty) {

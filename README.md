@@ -16,7 +16,7 @@ The library owns the **canvas engine only** — toolbars, insert bars, property 
 
 ```yaml
 dependencies:
-  flutter_canvas_editor: ^1.1.0
+  flutter_canvas_editor: ^1.2.0
 ```
 
 Then:
@@ -40,6 +40,7 @@ A runnable example app lives in [`example/`](example/). From the package root:
 ```bash
 cd example
 flutter run
+flutter run -d chrome
 ```
 
 Or embed the editor directly:
@@ -252,7 +253,7 @@ _controller = CanvasEditorController({
 | Parameter | Purpose |
 |---|---|
 | `initialDocument` | Starting canvas state. Defaults to a 1080×1080 white background. |
-| `imageProvider` | Required only for `assetId` / remote / bundled assets (see [Image Loading](#image-loading)). Optional for `localPath`-only Hosts. |
+| `imageProvider` | Required for `assetId` / remote / bundled assets, and for every image on web (see [Image Loading](#image-loading)). Optional for `localPath`-only Hosts on Android, iOS, and desktop. |
 | `customNodeTypes` | Registers consumer-defined node types on this Controller only. |
 | `onDocumentChanged` | Fires when a Design Document change is **committed** (same moments as undo: gesture end, add/delete, style commit, undo/redo, load). Mid-drag/resize/rotate updates go to `stateStream` only. Use for Host dirty/autosave — not undo depth. |
 
@@ -286,6 +287,7 @@ controller.selectNode(null);     // clear selection
 ```dart
 controller.addTextNode({String? text, Offset? position, bool select = true});
 controller.addImageNode({required String localPath, bool select = true});
+// Web: localPath cannot be read. Use an ImageNode with assetId instead.
 controller.deleteNode(String nodeId);
 ```
 
@@ -409,7 +411,9 @@ Gestures out of the box — no extra wiring required:
 | Side handles (text nodes) | Horizontal resize only (design-tool-style); height reflows to fit wrapped text |
 | Rotation handle | Rotate around node centre |
 
-Text nodes use **horizontal-only resize handles** on the left and right sides. When text wraps, frame height is recalculated automatically via `TextReflow`.
+Text nodes use **horizontal-only resize handles** on the left and right sides. When text wraps, frame height is recalculated automatically to fit the text.
+
+Inline editing replaces the painted glyphs with a single transparent field in the node frame. It uses the node's font, size, line height, letter spacing, colour, and alignment — not the Host `TextField` theme — so the caret text stays where the canvas text was. Tap outside the field to commit.
 
 ---
 
@@ -422,7 +426,7 @@ Text nodes use **horizontal-only resize handles** on the left and right sides. W
 | macOS | ✅ |
 | Windows | ✅ |
 | Linux | ✅ |
-| Web | ❌ (deferred — see `docs/web-support-requirements.md`) |
+| Web | ✅ (`assetId` + `imageProvider`; `localPath` is IO-only) |
 
 ---
 
@@ -434,9 +438,11 @@ The Engine does **not** bundle fonts. New Text Nodes default to the **platform f
 
 ## Image Loading
 
-Images are referenced by `localPath` (device file) and/or `assetId` (opaque ID resolved by the Host). The Engine tries `localPath` first, then falls back to `imageProvider`.
+Images are referenced by `localPath` (device file) and/or `assetId` (opaque ID resolved by the Host). On Android, iOS, and desktop the Engine tries `localPath` first, then falls back to `imageProvider`.
 
-**`imageProvider` is required only for `assetId` / remote / bundled assets.** Gallery `localPath`-only Hosts can omit it — do not register a no-op callback “just in case.”
+On **web** there is no file system, so `localPath` is skipped. Use `assetId` with `imageProvider` (`NetworkImage`, `AssetImage`, or `MemoryImage`). `addImageNode` reads a local file to size the node and is limited to IO platforms; on web, put an `ImageNode` with `assetId` on the Design Document (or `loadDocument`).
+
+**`imageProvider` is required only for `assetId` / remote / bundled assets.** Gallery `localPath`-only Hosts on IO platforms can omit it — do not register a no-op callback “just in case.”
 
 ```dart
 // localPath-only Hosts: omit imageProvider entirely
@@ -551,9 +557,7 @@ The barrel file `package:flutter_canvas_editor/flutter_canvas_editor.dart` expor
 | `CoordinateSystem` | Doc ↔ screen mapping for custom overlays (most Hosts can ignore) |
 | `CanvasImageReference`, `CanvasImageLoader`, `CanvasImageProvider` | Image load path |
 
-Use [CanvasEditorWidget] — do not call `CanvasEditorController.buildCanvas` from Host UI.
-
-Internal implementation (`EditorBloc`, painters, hit-testing) is private under `lib/src/` and not part of the public API.
+Embed the canvas with `CanvasEditorWidget`. Symbols not listed here are not part of the public API.
 
 ---
 
@@ -566,11 +570,11 @@ MIT — see [LICENSE](LICENSE).
 ## Key Features Summary
 
 1. **Embedded editor engine** — zero chrome; consumer owns all UI around the canvas
-2. **Controller + state stream** — familiar Flutter pattern; BLoC is an internal detail
+2. **Controller + state stream** — drive the canvas from Host UI through the public controller
 3. **Document manipulation** — add/delete text and image nodes, update styles, background colour and image
 4. **Text reflow** — automatic height adjustment when content or width changes
 5. **design-tool-style text resize** — horizontal side handles only; height follows wrapped text
-6. **Inline text editing** — tap a selected text node again to edit on canvas
+6. **Inline text editing** — tap a selected text node again; one field, same metrics as the canvas text
 7. **Drag, resize, rotate** — built-in gesture handling with rotation anchor
 8. **Layer reordering** — bring forward / send backward / to front / to back
 9. **Undo / redo** — with history session coalescing for live property controls

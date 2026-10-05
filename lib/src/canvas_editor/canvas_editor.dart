@@ -155,6 +155,7 @@ class _CanvasEditorState extends State<CanvasEditor> {
                       imageCache: _imageCache,
                       theme: widget.theme,
                       devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+                      editingNodeId: _textEditingNodeId,
                     ),
                     size: Size(constraints.maxWidth, constraints.maxHeight),
                   ),
@@ -216,6 +217,21 @@ class _CanvasEditorState extends State<CanvasEditor> {
     final textNode = node;
 
     final screenRect = coords.docToScreenRect(textNode.frame);
+    final color = _parseHex(textNode.textColor);
+    // Same metrics as [CanvasPainter]. TextField otherwise merges the host
+    // theme (font, height, letter spacing) and a forced strut, so the caret
+    // text sits beside the painted glyphs.
+    final style = TextStyle(
+      inherit: false,
+      textBaseline: TextBaseline.alphabetic,
+      color: color,
+      fontFamily: textNode.fontFamily,
+      fontSize: textNode.fontSize * coords.viewportScale,
+      fontWeight: _fontWeight(textNode.fontWeight),
+      height: textNode.lineHeight,
+      letterSpacing: textNode.letterSpacing * coords.viewportScale,
+    );
+    final theme = Theme.of(context);
 
     return Positioned(
       left: screenRect.left,
@@ -229,28 +245,27 @@ class _CanvasEditorState extends State<CanvasEditor> {
           ..multiply(
             Matrix4.diagonal3Values(textNode.scaleX, textNode.scaleY, 1),
           ),
-        child: Container(
-          color: Colors.white.withAlpha(200),
+        child: Theme(
+          data: theme.copyWith(
+            textTheme: theme.textTheme.copyWith(
+              bodyLarge: style,
+              titleMedium: style,
+            ),
+          ),
           child: TextField(
             controller: _textController,
             focusNode: _textFocusNode,
             autofocus: true,
             maxLines: null,
             textInputAction: TextInputAction.done,
-            style: TextStyle(
-              color: _parseHex(textNode.textColor),
-              fontFamily: textNode.fontFamily,
-              fontSize: textNode.fontSize * coords.viewportScale,
-              fontWeight: _fontWeight(textNode.fontWeight),
-              height: textNode.lineHeight,
-              letterSpacing: textNode.letterSpacing * coords.viewportScale,
-            ),
+            textAlignVertical: TextAlignVertical.top,
+            scrollPadding: EdgeInsets.zero,
+            cursorWidth: 1.5,
+            cursorColor: color,
+            strutStyle: StrutStyle.disabled,
+            style: style,
             textAlign: _textAlign(textNode.textAlign),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.zero,
-              isCollapsed: true,
-            ),
+            decoration: const InputDecoration.collapsed(hintText: ''),
             onChanged: (value) {
               bloc.add(
                 UpdateNodeTextEvent(textNode.id, value, recordUndo: false),

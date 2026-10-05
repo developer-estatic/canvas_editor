@@ -158,6 +158,9 @@ class CanvasEditorController {
   }
 
   /// Adds an image Node from a local file path.
+  ///
+  /// Reads the file to size the node. On web, `localPath` cannot be read —
+  /// include an [ImageNode] with `assetId` and resolve it via [imageProvider].
   void addImageNode({required String localPath, bool select = true}) {
     _bloc.add(AddImageNodeEvent(localPath, select: select));
   }

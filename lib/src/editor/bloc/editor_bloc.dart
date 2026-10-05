@@ -1,10 +1,10 @@
-import 'dart:io' as io;
 import 'dart:ui' as ui;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../document/models/design_document.dart';
+import '../../shared/local_file_bytes.dart';
 
 // --- EVENTS ---
 abstract class EditorEvent extends Equatable {
@@ -476,7 +476,13 @@ class EditorBloc extends Bloc<EditorEvent, EditorState> {
   }
 
   Future<Size> _getImageSize(String path) async {
-    final bytes = await io.File(path).readAsBytes();
+    final bytes = await readLocalFileBytes(path);
+    if (bytes == null) {
+      throw StateError(
+        'Could not read image bytes from localPath "$path". '
+        'On web, add an ImageNode with assetId and resolve it through imageProvider.',
+      );
+    }
     final codec = await ui.instantiateImageCodec(bytes);
     final frameInfo = await codec.getNextFrame();
     final image = frameInfo.image;
